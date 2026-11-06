@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Demo Agentur</title>
+  <id>urn:demo:atom</id>
+  <updated>2026-11-06T05:00:00Z</updated>
+  <entry>
+    <title>Bundesrat beschliesst neues Klimapaket</title>
+    <link rel="alternate" href="https://example.net/klima-kopie"/>
+    <published>2026-11-06T04:30:00Z</published>
+    <summary>Kopie der Meldung.</summary>
+  </entry>
+  <entry>
+    <title>Neues Klimapaket: Kantone kritisieren Umsetzungsfristen</title>
+    <link rel="alternate" href="https://example.net/klima-kantone?utm_campaign=x"/>
+    <published>2026-11-06T04:40:00Z</published>
+    <summary>Mehrere Kantone fordern längere Fristen für die Umsetzung.</summary>
+    <content type="text">Mehrere Kantone fordern längere Fristen für die Umsetzung. Sie warnen vor Engpässen bei Handwerk und Planung.</content>
+    <category term="politik"/>
+  </entry>
+</feed>

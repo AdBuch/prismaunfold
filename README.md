@@ -96,3 +96,42 @@ Keep **News Intelligence**, **Media Marketplace** and **Editorial / Originals** 
 ---
 
 **North star:** *Help people understand the world, not tell them what to think, while making independent journalism economically sustainable.*
+
+---
+
+## MVP (Phase 1) quickstart
+
+The MVP uses only the Python standard library (3.11+). It builds one edition from RSS/Atom sources.
+
+```bash
+# Tests
+PYTHONPATH=src python3 -m unittest discover -s tests -v
+
+# Build an edition offline from the demo fixtures
+PYTHONPATH=src python3 -m prismunfold run \
+  --catalog tests/fixtures/catalog.json --fixtures tests/fixtures \
+  --now 2026-11-06T06:30:00+01:00
+
+# Build from live sources (only entries with status "active" in catalog/sources.json are fetched)
+PYTHONPATH=src python3 -m prismunfold run
+```
+
+Output lands in `site/` (one page per language, JSON in `site/data/`). The SQLite store is `data/prismunfold.sqlite3`. Both directories are git-ignored.
+
+### What the MVP does
+
+- Reads RSS 2.0 and Atom feeds, respects robots.txt, refuses DTDs and entities.
+- Drops articles that are stale, future-dated, AI-disclosed (if the source excludes AI), or syndicated copies. Each drop is logged with its reason.
+- Enforces source rights: `excerpt_only` drops the body, `link_only` drops the excerpt too.
+- Groups articles about the same event (title similarity within 36 hours, same language).
+- Writes an extractive summary. Each sentence cites its articles. Uncited sentences are removed.
+- Selects up to 25 events per edition, at most 5 per primary topic.
+- Builds editions at 00/06/12/18 local time for the configured time zone (IANA rules, DST-safe).
+
+### Not in the MVP yet
+
+- LLM summaries and translations (`NoTranslator` marks them as pending, the pages say so).
+- Personal ranking and feed keys (designed for the device, see the decision log).
+- Topic requests, a review queue for new sources, and a running scheduler.
+- Images are linked from the source, not stored locally.
+- Clustering works within one language only.

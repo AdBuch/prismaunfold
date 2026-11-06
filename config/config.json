@@ -1,0 +1,14 @@
+{
+  "edition_timezone": "Europe/Zurich",
+  "edition_hours": [0, 6, 12, 18],
+  "languages": ["de", "en", "es"],
+  "max_age_hours": 36,
+  "cluster_threshold": 0.2,
+  "cluster_window_hours": 36,
+  "max_sentences": 3,
+  "max_events_per_edition": 25,
+  "max_events_per_topic": 5,
+  "catalog_path": "catalog/sources.json",
+  "db_path": "data/prismunfold.sqlite3",
+  "site_dir": "site"
+}
