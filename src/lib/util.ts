@@ -6,7 +6,10 @@ export function esc(value: string | number | undefined): string {
 
 /** Tagged template that escapes interpolations unless wrapped in raw(). */
 export class Raw {
-  constructor(readonly value: string) {}
+  readonly value: string;
+  constructor(value: string) {
+    this.value = value;
+  }
 }
 export const raw = (s: string): Raw => new Raw(s);
 
@@ -54,4 +57,8 @@ export function formatTime(iso: string): string {
   return iso.length > 10 ? iso.slice(11, 16) : '';
 }
 
-export const isIsoDate = (s: string): boolean => /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(parseDate(s).getTime());
+export function isIsoDate(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  // Round-trip so that impossible dates such as 2026-13-01 or 2026-02-30 are rejected.
+  return parseDate(s).toISOString().slice(0, 10) === s;
+}
