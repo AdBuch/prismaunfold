@@ -112,3 +112,56 @@ Keep **News Intelligence**, **Media Marketplace** and **Editorial / Originals** 
 ---
 
 **North star:** *Help people understand the world, not tell them what to think, while making independent journalism economically sustainable.*
+
+
+## Phase 2 frontend prototype
+
+A runnable newspaper prototype lives in `src/`. **All content is fictional demo material**: no real events, publishers or sources, and nothing is verified. Source links use reserved `example.org` addresses.
+
+### Run it
+
+Requires Node.js 22 or newer.
+
+```bash
+npm install
+npm start          # builds, then serves http://localhost:4200
+```
+
+Other commands:
+
+```bash
+npm run dev        # rebuilds on change while serving
+npm run typecheck  # strict TypeScript check
+npm test           # unit tests (node:test, no browser needed)
+npm run test:e2e   # browser navigation tests; needs a running server and Playwright browsers
+```
+
+For the browser tests run `npx playwright install chromium` once, start `npm start`, then `npm run test:e2e` in a second terminal.
+
+### Screens
+
+| Route | Screen |
+| --- | --- |
+| `/` or `/edition/today` | Today's edition: masthead, lead, front-page columns, sections, in brief, magazine feature, clear end |
+| `/edition/:date` | Archived edition with previous/next and a date selector. Placements keep a snapshot of their original wording |
+| `/archive` | List of editions and a date picker with validation |
+| `/story/:slug` | Reader: sources, corrections, confidence note, story-so-far, related stories, share |
+| `/topic/:slug` | Topic timeline: milestones, reports, updates, corrections; filter and sort |
+| `/magazine/:slug` | Long-form template: hero, drop cap, pull quotes, sidebars, chronology, glossary, related reading |
+| `/magazine`, `/about` | Feature index and an explanation of the demo |
+
+### Architecture
+
+- `src/models.ts`: typed domain models (Edition, EditionStoryPlacement, Story, Topic, TimelineEvent, SourceReference, MagazineFeature).
+- `src/content/content-service.ts`: the `ContentService` interface. Views depend only on this. `fixture-service.ts` implements it with local fixtures, so a real API client can replace it later.
+- `src/content/*.ts`: fixtures (3 editions, 12 stories, 2 magazine features, 2 timelines).
+- `src/components/`: reusable editorial pieces. `src/views/`: one module per screen. `src/lib/`: router, escaping, procedural artwork.
+- Zero runtime dependencies. Build uses esbuild; types are checked with `tsc`.
+
+The artwork is procedurally generated and stands in for credited photography. Every image carries a `credit` field for real photo credits later.
+
+### Known limitations
+
+- Not Angular: the prototype uses plain TypeScript. The models and `ContentService` boundary carry over unchanged if the project later moves to Angular.
+- No preferences drawer, no real images, no backend, authentication or payments (all out of scope for Phase 2).
+- Fixtures are in English only.
