@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prismunfold.example/schemas/collector-report-v1.json",
+  "title": "Collector report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "agent", "model", "topic", "language", "edition", "created_at", "headline", "sentences", "sources", "uncertainties"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "agent": { "enum": ["codex", "claude", "vibe", "goose"] },
+    "model": { "type": "string", "description": "Model name as reported by the agent, or \"unknown\"." },
+    "topic": { "type": "string", "minLength": 1 },
+    "language": { "type": "string", "description": "BCP-47 tag of the report text, e.g. en, es, de." },
+    "edition": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "nothing_new": { "type": "boolean", "description": "True when no relevant development was found in the last 24 hours." },
+    "headline": { "type": "string", "minLength": 1 },
+    "sentences": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["text", "source_urls"],
+        "properties": {
+          "text": { "type": "string", "minLength": 1 },
+          "source_urls": { "type": "array", "minItems": 1, "items": { "type": "string", "format": "uri" } }
+        }
+      }
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["url", "title", "publisher"],
+        "properties": {
+          "url": { "type": "string", "format": "uri" },
+          "title": { "type": "string" },
+          "publisher": { "type": "string" },
+          "published_at": { "type": ["string", "null"], "format": "date-time" },
+          "language": { "type": "string" }
+        }
+      }
+    },
+    "uncertainties": { "type": "array", "items": { "type": "string" } }
+  }
+}

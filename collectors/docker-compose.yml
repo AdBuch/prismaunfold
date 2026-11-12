@@ -1,0 +1,35 @@
+# PrismUnfold collectors: one run-to-completion container per agent.
+# Run one:   docker compose run --rm claude
+# Run all:   docker compose up --build   (containers exit when done)
+# The same images run unchanged as Kubernetes CronJobs.
+
+x-collector: &collector
+  env_file: .env
+  environment:
+    TOPIC: ${TOPIC:?set TOPIC}
+    LANGUAGE: ${LANGUAGE:-en}
+    EDITION: ${EDITION:-}
+  volumes:
+    - ./out:/out
+  restart: "no"
+
+services:
+  codex:
+    <<: *collector
+    image: prismunfold/collector-codex
+    build: { context: ., dockerfile: codex/Dockerfile }
+
+  claude:
+    <<: *collector
+    image: prismunfold/collector-claude
+    build: { context: ., dockerfile: claude/Dockerfile }
+
+  vibe:
+    <<: *collector
+    image: prismunfold/collector-vibe
+    build: { context: ., dockerfile: vibe/Dockerfile }
+
+  goose:
+    <<: *collector
+    image: prismunfold/collector-goose
+    build: { context: ., dockerfile: goose/Dockerfile }
