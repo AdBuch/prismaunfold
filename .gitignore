@@ -2,3 +2,7 @@ data/
 site/
 __pycache__/
 *.egg-info/
+collectors/out/
+collectors/context/
+.env
+collectors/topics.txt

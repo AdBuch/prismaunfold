@@ -1,4 +1,4 @@
-"""One run: ingest -> editorial gate -> cluster -> summarise -> translate -> rank -> render."""
+"""One run: ingest -> editorial gate -> cluster -> summarise -> translate -> rank -> export JSON."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from .models import Article, Event, Source, Summary, to_jsonable
 from .normalize import sha1_id, title_key
 from .quality import rejection_reason
 from .rank import score, select
-from .render import render_site
+from .export import export_briefing
 from .storage import Store
 from .summarize import ExtractiveSummarizer, NoTranslator, NotConfigured, validate_summary
 
@@ -181,13 +181,13 @@ def run(
     chosen = select(scored, cfg["max_events_per_edition"], cfg["max_events_per_topic"])
     report.events = len(chosen)
 
-    # 5. Render.
+    # 5. Export JSON for the frontend.
     label = edition_label(start, tz_name)
     pages: dict[str, list[tuple[Event, Summary, list[Article]]]] = {}
     for event in chosen:
         arts = [articles_by_id[i] for i in event.article_ids]
         pages.setdefault(event.language, []).append((event, summaries[event.id], arts))
-    render_site(Path(site_dir), pages, label, start, end, now, tz_name, names)
+    export_briefing(Path(site_dir), pages, label, start, end, now, tz_name, names)
     for lang, items in pages.items():
         store.save_edition(
             f"{lang}|{start.isoformat()}",

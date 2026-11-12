@@ -22,13 +22,24 @@ mkdir -p out && chmod 777 out
 docker compose run --rm claude
 ```
 
-Output: `out/<edition>/<agent>/report.json` and `agent.log`. Exit code 0 means a
+Output: `out/<edition>/<agent>/<topic>.json` and `<topic>.log`. Exit code 0 means a
 report file exists; it does not mean the report is valid.
+
+A whole edition, all agents on all topics, including checking and export:
+
+```sh
+cp topics.example.txt topics.txt   # one line per topic: <language>|<topic>
+./run-edition.sh
+```
+
+`run-edition.sh` first asks the pipeline for our earlier coverage of each topic
+(`context/prior.md`), which the agents get appended to their prompt, and finally
+runs `prismunfold reports` to check, store, index and export what they wrote.
 
 Scheduled on one host, from the host's crontab (not cron inside the container):
 
 ```
-5 */6 * * * cd /srv/prismunfold/collectors && TOPIC="..." docker compose up
+5 */6 * * * /srv/prismunfold/collectors/run-edition.sh
 ```
 
 On Kubernetes, use one CronJob per agent with the same image, env from a Secret
@@ -36,7 +47,8 @@ and a volume (or object storage) mounted at `/out`.
 
 ## Status and known gaps
 
-These files are a first draft and have **not been built or run yet**.
+The images have **not been built or run yet**. The entrypoint script was run once
+outside Docker with a stand-in agent, and its report passed through the pipeline.
 
 - **Web search per agent is unverified.** Claude Code is given its web tools
   explicitly. Whether Codex, Vibe and goose can search the web out of the box, or
@@ -44,9 +56,10 @@ These files are a first draft and have **not been built or run yet**.
   `AGENT_ARGS` passes extra flags through.
 - **Sandboxing:** Codex's own sandbox may not work inside a container; it may need
   a different sandbox flag via `AGENT_ARGS`.
-- **Validation is not in the image.** The pipeline must validate each report
-  against the schema and reject sentences without a source before anything is
-  published.
+- **Validation is not in the image.** `prismunfold reports` checks structure and
+  drops sentences without a source URL. It does not open the cited URLs yet.
+- **Agents run one after another** per topic. Running them in parallel is a
+  later optimisation.
 - **Versions are not pinned.** Set the build args (`CODEX_VERSION`,
   `CLAUDE_CODE_VERSION`, `VIBE_VERSION`, `GOOSE_TAG`) once a working set is known.
 - **Cost limits** exist only as `MAX_TURNS` (Claude, Vibe). Set spending limits

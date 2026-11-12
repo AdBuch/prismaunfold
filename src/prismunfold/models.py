@@ -113,3 +113,55 @@ def article_from_dict(d: dict[str, Any]) -> Article:
             "topics": tuple(d.get("topics", ())),
         }
     )
+
+
+# --- Stories written by collector agents -------------------------------------------------
+
+
+@dataclass(frozen=True)
+class StorySource:
+    url: str
+    title: str
+    publisher: str
+    published_at: str | None = None
+    language: str | None = None
+
+
+@dataclass(frozen=True)
+class StorySentence:
+    text: str
+    source_urls: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class Story:
+    """One report by one agent on one topic for one edition."""
+
+    id: str
+    slug: str
+    agent: str
+    model: str
+    topic: str
+    topic_slug: str
+    language: str
+    edition: str
+    created_at: datetime
+    headline: str
+    sentences: tuple[StorySentence, ...]
+    sources: tuple[StorySource, ...]
+    uncertainties: tuple[str, ...] = ()
+    nothing_new: bool = False
+
+
+def story_from_dict(d: dict[str, Any]) -> Story:
+    return Story(
+        **{
+            **d,
+            "created_at": datetime.fromisoformat(d["created_at"]),
+            "sentences": tuple(
+                StorySentence(s["text"], tuple(s["source_urls"])) for s in d["sentences"]
+            ),
+            "sources": tuple(StorySource(**s) for s in d["sources"]),
+            "uncertainties": tuple(d.get("uncertainties", ())),
+        }
+    )

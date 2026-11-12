@@ -101,11 +101,17 @@ Keep **News Intelligence**, **Media Marketplace** and **Editorial / Originals** 
 
 ## MVP (Phase 1) quickstart
 
-The MVP uses only the Python standard library (3.11+). It builds one edition from RSS/Atom sources.
+The pipeline uses only the Python standard library (3.11+). It has two inputs: RSS/Atom feeds, and reports written by collector agents (see `collectors/`). Its only output is JSON for the frontend.
 
 ```bash
 # Tests
 PYTHONPATH=src python3 -m unittest discover -s tests -v
+
+# Check, store, index and export the collector agents' reports
+PYTHONPATH=src python3 -m prismunfold reports --reports-dir collectors/out
+
+# Write our earlier coverage of a topic, for the agents to build on
+PYTHONPATH=src python3 -m prismunfold context --topic "Swiss energy policy" --out collectors/context/prior.md
 
 # Build an edition offline from the demo fixtures
 PYTHONPATH=src python3 -m prismunfold run \
@@ -116,7 +122,21 @@ PYTHONPATH=src python3 -m prismunfold run \
 PYTHONPATH=src python3 -m prismunfold run
 ```
 
-Output lands in `site/` (one page per language, JSON in `site/data/`). The SQLite store is `data/prismunfold.sqlite3`. Both directories are git-ignored.
+Output lands in `site/api/v1/` as static JSON; the pipeline renders no HTML. The SQLite store is `data/prismunfold.sqlite3`. Both directories are git-ignored.
+
+| File | Content |
+| --- | --- |
+| `index.json` | Editions with agent-written stories, newest first |
+| `editions/<edition>.json` | Stories of one edition, grouped by topic; several writers per topic |
+| `stories/<slug>.json` | One story: sentences with source ids, sources, byline, AI disclosure |
+| `briefings/<lang>/latest.json` | Feed-based events of the current edition window |
+
+### Agent reports and the archive
+
+- A report is untrusted input. A sentence without a well-formed http(s) source URL is dropped; a report with no sourced sentence, an unknown agent or a mismatching edition is rejected, and `reports` exits with code 1.
+- Cited URLs are not opened yet, so a made-up but well-formed URL still passes. That check is the next step.
+- Every accepted story is added to a search index (SQLite FTS5, keyword ranking). `context` retrieves earlier stories on a topic and the collectors append them to the agent prompt. Embeddings can replace the keyword search later.
+- A story is never labelled as verified: confidence is `reported`, or `disputed` when uncertainties are listed.
 
 ### What the MVP does
 
@@ -130,7 +150,7 @@ Output lands in `site/` (one page per language, JSON in `site/data/`). The SQLit
 
 ### Not in the MVP yet
 
-- LLM summaries and translations (`NoTranslator` marks them as pending, the pages say so).
+- LLM summaries and translations (`NoTranslator` marks them as pending in the JSON).
 - Personal ranking and feed keys (designed for the device, see the decision log).
 - Topic requests, a review queue for new sources, and a running scheduler.
 - Images are linked from the source, not stored locally.

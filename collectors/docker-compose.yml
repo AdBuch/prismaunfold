@@ -11,6 +11,7 @@ x-collector: &collector
     EDITION: ${EDITION:-}
   volumes:
     - ./out:/out
+    - ./context:/context:ro
   restart: "no"
 
 services:

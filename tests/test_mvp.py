@@ -6,6 +6,7 @@ Run from the repository root:
 
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -19,7 +20,6 @@ from prismunfold.models import Article, Event, Sentence, Summary
 from prismunfold.normalize import canonical_url
 from prismunfold.pipeline import DEFAULTS, load_catalog, run
 from prismunfold.quality import rejection_reason
-from prismunfold.render import _e
 from prismunfold.storage import Store
 from prismunfold.summarize import validate_summary
 
@@ -161,11 +161,6 @@ class EditionWindowTest(unittest.TestCase):
         self.assertEqual(start.astimezone(ZoneInfo("Asia/Kathmandu")).hour, 0)
 
 
-class RenderTest(unittest.TestCase):
-    def test_html_is_escaped(self):
-        self.assertEqual(_e("<b>x</b>"), "&lt;b&gt;x&lt;/b&gt;")
-
-
 class PipelineTest(unittest.TestCase):
     def test_end_to_end_from_fixtures(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -182,12 +177,13 @@ class PipelineTest(unittest.TestCase):
             self.assertTrue(any("older" in r for r in reasons))
             self.assertTrue(any("duplicate title" in r for r in reasons))
 
-            page = (Path(tmp) / "site" / "de" / "index.html").read_text(encoding="utf-8")
-            self.assertIn("Zürcher Kantonsrat debattiert Velowege", page)
-            self.assertIn("nur eine Quelle", page)
-            self.assertIn("Übersetzung ausstehend", page)
-            self.assertNotIn("Automatisch erzeugter Kurzbericht", page)
-            self.assertNotIn("<script", page)
+            site = Path(tmp) / "site"
+            data = json.loads((site / "api/v1/briefings/de/latest.json").read_text(encoding="utf-8"))
+            titles = [item["event"]["title"] for item in data["events"]]
+            self.assertIn("Zürcher Kantonsrat debattiert Velowege", titles)
+            self.assertTrue(any(item["event"]["single_source"] for item in data["events"]))
+            self.assertTrue(all(item["summary"]["translations_pending"] for item in data["events"]))
+            self.assertEqual(list(site.rglob("*.html")), [])  # the pipeline renders no HTML
 
     def test_blocked_source_is_not_fetched(self):
         calls = []

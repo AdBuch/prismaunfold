@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .models import Article, article_from_dict, to_jsonable
+from .models import Article, Story, article_from_dict, story_from_dict, to_jsonable
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS articles (
@@ -23,7 +24,27 @@ CREATE TABLE IF NOT EXISTS editions (
     built_at TEXT NOT NULL,
     data TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS stories (
+    id TEXT PRIMARY KEY,
+    topic_slug TEXT NOT NULL,
+    language TEXT NOT NULL,
+    agent TEXT NOT NULL,
+    edition TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    data TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS stories_topic ON stories (topic_slug, created_at);
+CREATE VIRTUAL TABLE IF NOT EXISTS story_index USING fts5(
+    story_id UNINDEXED,
+    language UNINDEXED,
+    topic,
+    headline,
+    body,
+    tokenize = "unicode61 remove_diacritics 2"
+);
 """
+
+WORD_RE = re.compile(r"\w+")
 
 
 def _utc_iso(value: datetime) -> str:
@@ -65,3 +86,58 @@ class Store:
             "INSERT OR REPLACE INTO editions (id, language, built_at, data) VALUES (?, ?, ?, ?)",
             (edition_id, language, _utc_iso(built_at), json.dumps(payload, ensure_ascii=False)),
         )
+
+    # --- Stories written by collector agents, plus the archive index over them ---
+
+    def save_story(self, story: Story) -> None:
+        """Insert or replace a story and keep the search index in step."""
+        self.db.execute(
+            "INSERT OR REPLACE INTO stories (id, topic_slug, language, agent, edition, created_at, data) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                story.id,
+                story.topic_slug,
+                story.language,
+                story.agent,
+                story.edition,
+                _utc_iso(story.created_at),
+                json.dumps(to_jsonable(story), ensure_ascii=False),
+            ),
+        )
+        self.db.execute("DELETE FROM story_index WHERE story_id = ?", (story.id,))
+        self.db.execute(
+            "INSERT INTO story_index (story_id, language, topic, headline, body) VALUES (?, ?, ?, ?, ?)",
+            (
+                story.id,
+                story.language,
+                story.topic,
+                story.headline,
+                " ".join(s.text for s in story.sentences),
+            ),
+        )
+
+    def all_stories(self) -> list[Story]:
+        rows = self.db.execute("SELECT data FROM stories ORDER BY created_at").fetchall()
+        return [story_from_dict(json.loads(row[0])) for row in rows]
+
+    def stories_for_topic(self, topic_slug: str, language: str | None = None, limit: int = 5) -> list[Story]:
+        rows = self.db.execute(
+            "SELECT data FROM stories WHERE topic_slug = ? AND (? IS NULL OR language = ?) "
+            "ORDER BY created_at DESC LIMIT ?",
+            (topic_slug, language, language, limit),
+        ).fetchall()
+        return [story_from_dict(json.loads(row[0])) for row in rows]
+
+    def search_stories(self, query: str, language: str | None = None, limit: int = 5) -> list[Story]:
+        """Keyword search over the archive, best match first. Any query word may match."""
+        words = [w for w in WORD_RE.findall(query) if len(w) >= 3]
+        if not words:
+            return []
+        match = " OR ".join(f'"{w}"' for w in words)
+        rows = self.db.execute(
+            "SELECT s.data FROM story_index JOIN stories s ON s.id = story_index.story_id "
+            "WHERE story_index MATCH ? AND (? IS NULL OR story_index.language = ?) "
+            "ORDER BY bm25(story_index) LIMIT ?",
+            (match, language, language, limit),
+        ).fetchall()
+        return [story_from_dict(json.loads(row[0])) for row in rows]

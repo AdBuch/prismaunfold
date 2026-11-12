@@ -1,0 +1,5 @@
+# One topic per line: <language>|<topic>
+# Copy to topics.txt and edit. Each agent writes one report per line.
+en|Swiss federal politics
+de|Energiepolitik in der Schweiz
+es|Política económica en Perú
