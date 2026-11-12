@@ -115,7 +115,10 @@ class PostgresStoreTest(unittest.TestCase):
             self.assertEqual(code, 0)
             self.assertEqual(len(self.store.all_stories()), 3)
             edition = json.loads((Path(tmp) / "site/api/v1/editions/2026-11-12T18.json").read_text(encoding="utf-8"))
-            self.assertEqual(len(edition["topics"][0]["stories"]), 2)  # claude and goose share the topic
+            by_topic = {t["topicSlug"]: t["stories"] for t in edition["topics"]}
+            # claude and goose wrote about the same topic, codex about another one
+            self.assertEqual({s["agent"] for s in by_topic["swiss-energy-policy"]}, {"claude", "goose"})
+            self.assertEqual([s["agent"] for s in by_topic["alpine-tourism"]], ["codex"])
 
 
 if __name__ == "__main__":

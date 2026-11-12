@@ -7,6 +7,12 @@ on:
 permissions:
   contents: read
 
+# Explicit bash makes GitHub run every step with "-eo pipefail", so a failure
+# on the left side of a pipe fails the step.
+defaults:
+  run:
+    shell: bash
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -43,6 +49,7 @@ jobs:
         env:
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
         run: |
+          set -o pipefail  # a failing test must fail the step, not be hidden by tee
           PYTHONPATH=src python -m unittest discover -s tests -v 2>&1 | tee test.log
           # The PostgreSQL tests must really have run, not been skipped.
           ! grep -q "TEST_DATABASE_URL is not set" test.log
@@ -101,6 +108,7 @@ jobs:
 
       - name: A collector without credentials stays idle
         run: |
+          set -o pipefail
           docker compose run --rm -T -e WORKER_INTERVAL= claude 2>&1 | tee idle.log
           grep -q "stays idle" idle.log
 
@@ -132,6 +140,7 @@ jobs:
 
       - name: The story is stored in PostgreSQL
         run: |
+          set -o pipefail
           docker compose exec -T db psql -U prismunfold -d prismunfold -At \
             -c "SELECT agent, language, data->>'headline' FROM stories" | tee stories.txt
           test "$(wc -l < stories.txt)" = "1"
