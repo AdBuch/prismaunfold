@@ -11,6 +11,7 @@ from pathlib import Path
 from prismunfold.archive import prior_coverage, related_stories
 from prismunfold.cli import main
 from prismunfold.export import export_stories
+from prismunfold.linkcheck import check_story, http_probe, is_public_host
 from prismunfold.reports import ReportError, load_reports, parse_report
 from prismunfold.storage import Store
 
@@ -90,6 +91,27 @@ class ParseReportTest(unittest.TestCase):
         one = report(sentences=REPORT["sentences"][:1])
         story, _ = parse_report(one)
         self.assertTrue(any("single publisher" in u for u in story.uncertainties))
+
+
+class LinkCheckTest(unittest.TestCase):
+    def test_dead_sources_are_removed_and_their_sentences_dropped(self):
+        story, _ = parse_report(REPORT)
+        checked, problems = check_story(story, probe=lambda url: "news.example.org" in url)
+        self.assertEqual([s.text for s in checked.sentences], [story.sentences[0].text])
+        self.assertEqual([s.url for s in checked.sources], ["https://news.example.org/solar"])
+        self.assertTrue(any("no reachable source" in p for p in problems))
+
+    def test_story_with_only_dead_sources_is_rejected(self):
+        story, _ = parse_report(REPORT)
+        checked, problems = check_story(story, probe=lambda url: False)
+        self.assertIsNone(checked)
+        self.assertTrue(problems[-1].startswith("rejected"))
+
+    def test_private_and_loopback_targets_are_never_contacted(self):
+        for host in ("127.0.0.1", "10.0.0.5", "169.254.169.254", "::1", "no-such-host.invalid"):
+            self.assertFalse(is_public_host(host), host)
+        self.assertFalse(http_probe("http://127.0.0.1:8080/admin"))
+        self.assertFalse(http_probe("file:///etc/passwd"))
 
 
 class ArchiveTest(unittest.TestCase):

@@ -28,4 +28,4 @@ while IFS='|' read -r LANGUAGE TOPIC; do
   done
 done < "$TOPICS"
 
-pipeline reports --reports-dir collectors/out --edition "$EDITION"
+pipeline reports --reports-dir collectors/out --edition "$EDITION" --check-links

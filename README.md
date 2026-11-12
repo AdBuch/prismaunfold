@@ -134,7 +134,7 @@ Output lands in `site/api/v1/` as static JSON; the pipeline renders no HTML. The
 ### Agent reports and the archive
 
 - A report is untrusted input. A sentence without a well-formed http(s) source URL is dropped; a report with no sourced sentence, an unknown agent or a mismatching edition is rejected, and `reports` exits with code 1.
-- Cited URLs are not opened yet, so a made-up but well-formed URL still passes. That check is the next step.
+- With `--check-links`, every cited URL is opened; sources that do not answer are removed and sentences left without a source are dropped. Only public hosts are contacted. This catches invented links, not a real page that fails to support the sentence.
 - Every accepted story is added to a search index (SQLite FTS5, keyword ranking). `context` retrieves earlier stories on a topic and the collectors append them to the agent prompt. Embeddings can replace the keyword search later.
 - A story is never labelled as verified: confidence is `reported`, or `disputed` when uncertainties are listed.
 

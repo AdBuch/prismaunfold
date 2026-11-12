@@ -57,7 +57,8 @@ outside Docker with a stand-in agent, and its report passed through the pipeline
 - **Sandboxing:** Codex's own sandbox may not work inside a container; it may need
   a different sandbox flag via `AGENT_ARGS`.
 - **Validation is not in the image.** `prismunfold reports` checks structure and
-  drops sentences without a source URL. It does not open the cited URLs yet.
+  drops sentences without a source URL. `--check-links` also opens the cited
+  URLs; that code is tested with stand-in responses only, not against the live web.
 - **Agents run one after another** per topic. Running them in parallel is a
   later optimisation.
 - **Versions are not pinned.** Set the build args (`CODEX_VERSION`,

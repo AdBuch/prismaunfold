@@ -14,6 +14,7 @@ from pathlib import Path
 from .archive import prior_coverage
 from .export import export_stories
 from .ingest import fetch_feed
+from .linkcheck import check_story
 from .models import Source
 from .pipeline import load_catalog, load_config, run
 from .reports import load_reports
@@ -74,6 +75,9 @@ def _reports(args: argparse.Namespace, cfg: dict) -> int:
     accepted = rejected = 0
     try:
         for path, story, problems in results:
+            if story is not None and args.check_links:
+                story, link_problems = check_story(story)
+                problems = problems + link_problems
             if story is None:
                 rejected += 1
             else:
@@ -111,6 +115,11 @@ def main(argv: list[str] | None = None) -> int:
     rep_cmd = sub.add_parser("reports", parents=[common], help="check, store and export agent reports")
     rep_cmd.add_argument("--reports-dir", default="collectors/out")
     rep_cmd.add_argument("--edition", help="only this edition (default: all found)")
+    rep_cmd.add_argument(
+        "--check-links",
+        action="store_true",
+        help="open every cited URL; drop sources that do not answer (needs network)",
+    )
 
     args = parser.parse_args(argv)
     cfg = load_config(args.config)
