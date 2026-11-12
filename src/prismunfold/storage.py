@@ -116,6 +116,9 @@ class Store:
             ),
         )
 
+    def has_story(self, story_id: str) -> bool:
+        return self.db.execute("SELECT 1 FROM stories WHERE id = ?", (story_id,)).fetchone() is not None
+
     def all_stories(self) -> list[Story]:
         rows = self.db.execute("SELECT data FROM stories ORDER BY created_at").fetchall()
         return [story_from_dict(json.loads(row[0])) for row in rows]

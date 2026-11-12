@@ -6,12 +6,15 @@ import copy
 import json
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 from prismunfold.archive import prior_coverage, related_stories
 from prismunfold.cli import main
 from prismunfold.export import export_stories
+from prismunfold.edition import agent_edition
 from prismunfold.linkcheck import check_story, http_probe, is_public_host
+from prismunfold.plan import load_topics
 from prismunfold.reports import ReportError, load_reports, parse_report
 from prismunfold.storage import Store
 
@@ -209,6 +212,54 @@ class ExportAndCliTest(unittest.TestCase):
             out = Path(tmp) / "prior.md"
             self.assertEqual(main(["context", *args, "--topic", "Swiss energy policy", "--out", str(out)]), 0)
             self.assertIn("Solar bill reaches parliament", out.read_text(encoding="utf-8"))
+
+    def test_second_run_skips_known_reports(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.write_reports(Path(tmp) / "out")
+            args = ["reports", "--config", "", "--db", f"{tmp}/db.sqlite3", "--site", f"{tmp}/site",
+                    "--reports-dir", f"{tmp}/out"]
+            main(args)
+            store = Store(f"{tmp}/db.sqlite3")
+            self.assertEqual(len(store.all_stories()), 2)
+            store.close()
+            self.assertEqual(main(args), 1)  # rejected reports stay visible on every run
+
+    def test_plan_writes_jobs_and_context_for_the_collectors(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.write_reports(Path(tmp) / "out")
+            base = ["--config", "", "--db", f"{tmp}/db.sqlite3", "--site", f"{tmp}/site"]
+            main(["reports", *base, "--reports-dir", f"{tmp}/out"])
+            topics = Path(tmp) / "topics.txt"
+            topics.write_text("# comment\n\nen|Swiss  energy policy\nde|Energiepolitik in Zürich\n"
+                              "en|Swiss energy policy\n", encoding="utf-8")
+            code = main(["plan", *base, "--topics", str(topics), "--shared-dir", f"{tmp}/shared",
+                         "--now", "2026-11-13T07:59:00+01:00"])
+            self.assertEqual(code, 0)
+            lines = (Path(tmp) / "shared/jobs/current.tsv").read_text(encoding="utf-8").splitlines()
+            self.assertEqual(lines[0], "#edition 2026-11-13T06")
+            self.assertEqual(lines[1:], [
+                "en-swiss-energy-policy\ten\tSwiss energy policy",
+                "de-energiepolitik-in-zurich\tde\tEnergiepolitik in Zürich",
+            ])
+            context = Path(tmp) / "shared/context/2026-11-13T06"
+            self.assertIn("Solar bill", (context / "en-swiss-energy-policy.md").read_text(encoding="utf-8"))
+            self.assertEqual((context / "de-energiepolitik-in-zurich.md").read_text(encoding="utf-8"), "")
+            self.assertEqual(list(Path(tmp).rglob("*.tmp")), [])
+
+    def test_plan_without_topics_file_is_not_an_error(self):
+        self.assertEqual(main(["plan", "--config", "", "--topics", "/nonexistent/topics.txt"]), 0)
+
+    def test_bad_topic_line_is_reported_with_its_line_number(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "topics.txt"
+            path.write_text("en|ok\njust a topic\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "topics.txt:2"):
+                load_topics(path)
+
+    def test_agent_edition_is_a_six_hour_utc_block(self):
+        self.assertEqual(agent_edition(datetime(2026, 11, 12, 23, 59, tzinfo=timezone.utc)), "2026-11-12T18")
+        self.assertEqual(agent_edition(datetime.fromisoformat("2026-11-13T00:30:00+01:00")), "2026-11-12T18")
+        self.assertEqual(agent_edition(datetime(2026, 11, 13, 0, 0, tzinfo=timezone.utc)), "2026-11-13T00")
 
     def test_export_skips_nothing_new_reports(self):
         with tempfile.TemporaryDirectory() as tmp:

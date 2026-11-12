@@ -1,0 +1,99 @@
+# PrismUnfold: every component in its own container.
+#
+#   cp .env.example .env                              # add at least one agent's API key
+#   cp config/topics.example.txt config/topics.txt    # choose the topics
+#   docker compose up --build -d
+#   open http://localhost:8080/api/v1/index.json
+#
+# pipeline   plans each 6-hour edition, checks the agents' reports, keeps the archive, exports JSON
+# codex, claude, vibe, goose
+#            one writer each; picks up the job list and writes one report per topic.
+#            An agent without credentials in .env logs that and stays idle.
+# web        serves the exported JSON on port 8080
+#
+# Containers talk only through volumes:
+#   shared   pipeline -> collectors   job list and prior coverage     (collectors: read-only)
+#   reports  collectors -> pipeline   one JSON report per agent and topic
+#   site     pipeline -> web          exported JSON                    (web: read-only)
+#   data     pipeline only            SQLite store and archive index
+
+x-collector: &collector
+  env_file: .env
+  environment:
+    WORKER_INTERVAL: ${WORKER_INTERVAL:-300}
+  entrypoint: ["/opt/collector/worker.sh"]
+  volumes:
+    - reports:/out
+    - shared:/shared:ro
+  depends_on:
+    volumes-init:
+      condition: service_completed_successfully
+  restart: on-failure
+
+services:
+  # Named volumes start out owned by root; the services run as unprivileged users.
+  volumes-init:
+    image: busybox:stable
+    command: ["sh", "-c", "chmod 1777 /out && chown 1000:1000 /data /site /shared"]
+    volumes:
+      - reports:/out
+      - data:/data
+      - site:/site
+      - shared:/shared
+    restart: "no"
+
+  pipeline:
+    image: prismunfold/pipeline
+    build: { context: ., dockerfile: docker/pipeline/Dockerfile }
+    environment:
+      PIPELINE_INTERVAL: ${PIPELINE_INTERVAL:-600}
+      CHECK_LINKS: ${CHECK_LINKS:-1}
+    volumes:
+      - ./config:/app/config:ro
+      - ./catalog:/app/catalog:ro
+      - data:/data
+      - site:/site
+      - shared:/shared
+      - reports:/out:ro
+    depends_on:
+      volumes-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  codex:
+    <<: *collector
+    image: prismunfold/collector-codex
+    build: { context: collectors, dockerfile: codex/Dockerfile }
+
+  claude:
+    <<: *collector
+    image: prismunfold/collector-claude
+    build: { context: collectors, dockerfile: claude/Dockerfile }
+
+  vibe:
+    <<: *collector
+    image: prismunfold/collector-vibe
+    build: { context: collectors, dockerfile: vibe/Dockerfile }
+
+  goose:
+    <<: *collector
+    image: prismunfold/collector-goose
+    build: { context: collectors, dockerfile: goose/Dockerfile }
+
+  web:
+    image: prismunfold/web
+    build: { context: ., dockerfile: docker/web/Dockerfile }
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+    volumes:
+      - site:/site:ro
+    depends_on:
+      volumes-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  data:
+  site:
+  shared:
+  reports:

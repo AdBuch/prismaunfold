@@ -10,7 +10,7 @@ RUN apt-get update \
  && useradd --create-home --uid 1000 collector \
  && mkdir -p /work /out && chown collector:collector /work /out
 
-COPY --chmod=755 common/collect.sh /opt/collector/collect.sh
+COPY --chmod=755 common/collect.sh common/worker.sh /opt/collector/
 COPY common/assignment.md common/report.schema.json /opt/collector/
 
 ENV AGENT=vibe

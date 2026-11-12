@@ -1,0 +1,27 @@
+#!/bin/sh
+# Stand-in for the Claude Code CLI in the CI smoke test. No network, no model.
+# Reads the prompt (second argument, after -p) and writes a minimal valid report
+# to the path the prompt names. Topics containing "FAIL" simulate a crashing agent.
+prompt="$2"
+field() { printf '%s\n' "$prompt" | sed -n "s/^$1: //p" | head -n 1; }
+path="$(field 'Write the report to this exact path')"
+topic="$(field 'Topic')"
+case "$topic" in *FAIL*) echo "fake agent: simulated crash" >&2; exit 3 ;; esac
+cat > "$path" <<EOT
+{
+  "schema_version": 1,
+  "agent": "claude",
+  "model": "fake-agent",
+  "topic": "$topic",
+  "language": "$(field 'Report language')",
+  "edition": "$(field 'Edition')",
+  "created_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "headline": "Smoke test report on $topic",
+  "sentences": [
+    {"text": "This sentence has a source.", "source_urls": ["https://example.org/a"]},
+    {"text": "This sentence has none and must be dropped.", "source_urls": []}
+  ],
+  "sources": [{"url": "https://example.org/a", "title": "Example", "publisher": "Example"}],
+  "uncertainties": []
+}
+EOT

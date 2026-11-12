@@ -99,6 +99,42 @@ Keep **News Intelligence**, **Media Marketplace** and **Editorial / Originals** 
 
 ---
 
+## Run everything with Docker
+
+Every component runs in its own container.
+
+```bash
+cp .env.example .env                              # add at least one agent's API key
+cp config/topics.example.txt config/topics.txt    # one line per topic: <language>|<topic>
+docker compose up --build -d
+curl http://localhost:8080/api/v1/index.json
+```
+
+| Container | Job |
+| --- | --- |
+| `pipeline` | Every 10 minutes: plans the current 6-hour edition, checks the agents' reports, keeps the archive, exports JSON |
+| `codex`, `claude`, `vibe`, `goose` | One writer each. Reads the job list, writes one report per topic. Idle without credentials |
+| `web` | Serves the exported JSON on port 8080 |
+| `volumes-init` | Sets volume permissions once, then exits |
+
+The containers talk only through volumes: the pipeline writes the job list and our
+prior coverage of each topic, the collectors write reports, the pipeline checks them
+and exports JSON, the web container serves it. No container starts another one and
+none needs the Docker socket.
+
+Useful commands:
+
+```bash
+docker compose logs -f pipeline claude        # what is happening
+docker compose run --rm pipeline reports --reports-dir /out --force   # re-check all reports
+docker compose down                           # stop; add -v to delete all data
+```
+
+Status: CI builds all images and runs the stack with a stand-in agent
+(`.github/workflows/ci.yml`). A run with real agents and API keys has not happened
+yet; see `collectors/README.md` for the open points. The frontend is not part of
+this setup yet, and storage is SQLite on a volume, not PostgreSQL.
+
 ## MVP (Phase 1) quickstart
 
 The pipeline uses only the Python standard library (3.11+). It has two inputs: RSS/Atom feeds, and reports written by collector agents (see `collectors/`). Its only output is JSON for the frontend.

@@ -5,4 +5,5 @@ __pycache__/
 collectors/out/
 collectors/context/
 .env
-collectors/topics.txt
+config/topics.txt
+collectors/shared/

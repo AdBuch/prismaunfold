@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Unit tests
+        run: PYTHONPATH=src python -m unittest discover -s tests -v
+
+  scripts:
+    name: Shell scripts and compose files
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: ShellCheck
+        run: |
+          shellcheck --shell=sh --severity=warning \
+            collectors/common/collect.sh collectors/common/worker.sh \
+            collectors/run-edition.sh docker/pipeline/scheduler.sh \
+            tests/fixtures/fake-agent/claude
+      - name: Compose files are valid
+        run: |
+          cp .env.example .env
+          cp collectors/.env.example collectors/.env
+          docker compose config --quiet
+          TOPIC=ci docker compose -f collectors/docker-compose.yml config --quiet
+
+  images:
+    name: Build images and run the stack
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build all images
+        run: |
+          cp .env.example .env
+          docker compose build
+
+      - name: Each agent CLI is installed and starts
+        run: |
+          docker run --rm --entrypoint codex  prismunfold/collector-codex  --version
+          docker run --rm --entrypoint claude prismunfold/collector-claude --version
+          docker run --rm --entrypoint vibe   prismunfold/collector-vibe   --version
+          docker run --rm --entrypoint goose  prismunfold/collector-goose  --version
+
+      - name: Start pipeline and web
+        run: |
+          printf 'en|CI smoke topic\nen|CI FAIL topic\n' > config/topics.txt
+          PIPELINE_INTERVAL=5 CHECK_LINKS=0 docker compose up -d volumes-init pipeline web
+
+      - name: Pipeline publishes the job list
+        run: |
+          for i in $(seq 1 30); do
+            if docker compose exec -T pipeline test -s /shared/jobs/current.tsv; then break; fi
+            sleep 2
+          done
+          docker compose exec -T pipeline cat /shared/jobs/current.tsv
+
+      - name: A collector without credentials stays idle
+        run: |
+          docker compose run --rm -T -e WORKER_INTERVAL= claude 2>&1 | tee idle.log
+          grep -q "stays idle" idle.log
+
+      - name: Collector writes reports (stand-in agent, no API key needed)
+        run: |
+          docker compose run --rm -T \
+            -v "$PWD/tests/fixtures/fake-agent:/fake:ro" \
+            -e PATH=/fake:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+            -e ANTHROPIC_API_KEY=not-a-real-key \
+            -e WORKER_INTERVAL= \
+            claude
+
+      - name: Web serves the checked story
+        run: |
+          for i in $(seq 1 30); do
+            count="$(curl -fsS http://localhost:8080/api/v1/index.json | jq '.editions[0].storyCount // 0' || echo 0)"
+            if [ "$count" = "1" ]; then break; fi
+            sleep 2
+          done
+          curl -fsS http://localhost:8080/api/v1/index.json | tee index.json
+          test "$(jq '.editions[0].storyCount' index.json)" = "1"
+          edition="$(jq -r '.editions[0].path' index.json)"
+          slug="$(curl -fsS "http://localhost:8080/api/v1/$edition" | jq -r '.topics[0].stories[0].slug')"
+          curl -fsS "http://localhost:8080/api/v1/stories/$slug.json" | tee story.json
+          # The unsourced sentence was dropped; the failing topic produced no story.
+          test "$(jq '.sentences | length' story.json)" = "1"
+          test "$(jq -r '.byline' story.json)" = "Claude Code"
+          curl -fsS http://localhost:8080/healthz
+
+      - name: Logs
+        if: always()
+        run: docker compose logs --no-color --tail 200
+
+      - name: Stop
+        if: always()
+        run: docker compose down -v

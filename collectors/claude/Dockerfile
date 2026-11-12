@@ -9,7 +9,7 @@ RUN apt-get update \
  && npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} \
  && mkdir -p /work /out && chown node:node /work /out
 
-COPY --chmod=755 common/collect.sh /opt/collector/collect.sh
+COPY --chmod=755 common/collect.sh common/worker.sh /opt/collector/
 COPY common/assignment.md common/report.schema.json /opt/collector/
 
 ENV AGENT=claude DISABLE_AUTOUPDATER=1

@@ -2,20 +2,23 @@
 
     prismunfold run      build one feed-based edition (ingest, cluster, summarise, export JSON)
     prismunfold context  write the archive's prior coverage of a topic for the collector agents
+    prismunfold plan     write the job list and prior coverage for the collector containers
     prismunfold reports  check the collector agents' reports, store, index and export them
 """
 
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .archive import prior_coverage
+from .edition import agent_edition
 from .export import export_stories
 from .ingest import fetch_feed
 from .linkcheck import check_story
 from .models import Source
+from .plan import load_topics, write_plan
 from .pipeline import load_catalog, load_config, run
 from .reports import load_reports
 from .storage import Store
@@ -68,13 +71,38 @@ def _context(args: argparse.Namespace, cfg: dict) -> int:
     return 0
 
 
+def _plan(args: argparse.Namespace, cfg: dict) -> int:
+    if not Path(args.topics).exists():
+        print(f"plan: no topics file at {args.topics}; nothing for the collectors to do")
+        return 0
+    jobs = load_topics(args.topics)
+    edition = agent_edition(_parse_now(args.now))
+    store = Store(args.db or cfg["db_path"])
+    try:
+        path = write_plan(store, jobs, edition, args.shared_dir)
+    finally:
+        store.close()
+    print(f"plan: edition={edition} topics={len(jobs)} -> {path}")
+    return 0
+
+
 def _reports(args: argparse.Namespace, cfg: dict) -> int:
     """Exit code 1 when at least one report was rejected, so a scheduler notices."""
-    results = load_reports(args.reports_dir, args.edition)
+    now = _parse_now(None)
+    if args.edition == "current":
+        editions: list[str | None] = [agent_edition(now)]
+    elif args.edition == "recent":  # a report may arrive after its edition has ended
+        editions = [agent_edition(now - timedelta(hours=6)), agent_edition(now)]
+    else:
+        editions = [args.edition]
+    results = [r for edition in editions for r in load_reports(args.reports_dir, edition)]
     store = Store(args.db or cfg["db_path"])
-    accepted = rejected = 0
+    accepted = rejected = known = 0
     try:
         for path, story, problems in results:
+            if story is not None and not args.force and store.has_story(story.id):
+                known += 1  # already checked and published; do not probe its links again
+                continue
             if story is not None and args.check_links:
                 story, link_problems = check_story(story)
                 problems = problems + link_problems
@@ -89,7 +117,10 @@ def _reports(args: argparse.Namespace, cfg: dict) -> int:
         written = export_stories(store, args.site or cfg["site_dir"])
     finally:
         store.close()
-    print(f"reports: accepted={accepted} rejected={rejected} files_written={len(written)}")
+    print(
+        f"reports: accepted={accepted} already_known={known} rejected={rejected} "
+        f"files_written={len(written)}"
+    )
     return 1 if rejected else 0
 
 
@@ -112,9 +143,15 @@ def main(argv: list[str] | None = None) -> int:
     ctx_cmd.add_argument("--limit", type=int, default=5)
     ctx_cmd.add_argument("--out", required=True, help="markdown file to write (empty if nothing found)")
 
+    plan_cmd = sub.add_parser("plan", parents=[common], help="write jobs and context for the collectors")
+    plan_cmd.add_argument("--topics", default="config/topics.txt")
+    plan_cmd.add_argument("--shared-dir", default="collectors/shared")
+    plan_cmd.add_argument("--now", help="ISO 8601 time to plan for (default: current time)")
+
     rep_cmd = sub.add_parser("reports", parents=[common], help="check, store and export agent reports")
     rep_cmd.add_argument("--reports-dir", default="collectors/out")
-    rep_cmd.add_argument("--edition", help="only this edition (default: all found)")
+    rep_cmd.add_argument("--edition", help="only this edition; 'current', or 'recent' for current and previous (default: all)")
+    rep_cmd.add_argument("--force", action="store_true", help="re-check reports that are already stored")
     rep_cmd.add_argument(
         "--check-links",
         action="store_true",
@@ -123,7 +160,7 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     cfg = load_config(args.config)
-    return {"run": _run, "context": _context, "reports": _reports}[args.command](args, cfg)
+    return {"run": _run, "context": _context, "plan": _plan, "reports": _reports}[args.command](args, cfg)
 
 
 if __name__ == "__main__":

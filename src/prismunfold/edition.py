@@ -36,3 +36,12 @@ def edition_window(
 
 def edition_label(start: datetime, tz_name: str) -> str:
     return f"{start.astimezone(ZoneInfo(tz_name)):%Y-%m-%d %H:%M} {tz_name}"
+
+
+def agent_edition(now: datetime, block_hours: int = 6) -> str:
+    """Id of the edition the collector agents write for: UTC time floored to the block.
+
+    Example: 2026-11-12 19:40 UTC -> "2026-11-12T18". Used as a directory and file name.
+    """
+    utc = now.astimezone(UTC)
+    return f"{utc:%Y-%m-%d}T{utc.hour - utc.hour % block_hours:02d}"

@@ -15,6 +15,11 @@ output contract in `common/report.schema.json`. Only the CLI call differs.
 
 ## Run
 
+The normal way is the stack in the repository root (`docker compose up`, see the
+main README): there each collector runs `common/worker.sh`, which works through
+the pipeline's job list. The commands below run a single agent on a single topic
+by hand, which is useful for trying out an agent.
+
 ```sh
 cd collectors
 cp .env.example .env        # fill in keys and TOPIC
@@ -28,7 +33,7 @@ report file exists; it does not mean the report is valid.
 A whole edition, all agents on all topics, including checking and export:
 
 ```sh
-cp topics.example.txt topics.txt   # one line per topic: <language>|<topic>
+cp ../config/topics.example.txt ../config/topics.txt   # one line per topic: <language>|<topic>
 ./run-edition.sh
 ```
 

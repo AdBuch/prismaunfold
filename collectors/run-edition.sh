@@ -8,7 +8,7 @@
 set -eu
 cd "$(dirname "$0")"
 
-TOPICS="${1:-topics.txt}"
+TOPICS="${1:-../config/topics.txt}"
 AGENTS="${AGENTS:-codex claude vibe goose}"
 EDITION="${EDITION:-$(date -u +%Y-%m-%dT%H)}"
 export EDITION
