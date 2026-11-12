@@ -1,4 +1,10 @@
-"""SQLite persistence (stdlib only). Records are stored as JSON documents next to indexed columns."""
+"""Persistence. `open_store` picks the backend from the target:
+
+    postgresql://user:pass@host/db   PostgreSQL (storage_pg.PostgresStore, needs psycopg)
+    anything else                    a SQLite file (stdlib only; tests and local runs)
+
+Both backends offer the same methods. Records are JSON documents next to indexed columns.
+"""
 
 from __future__ import annotations
 
@@ -49,6 +55,15 @@ WORD_RE = re.compile(r"\w+")
 
 def _utc_iso(value: datetime) -> str:
     return value.astimezone(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def open_store(target: str | Path):
+    """Return a PostgresStore for a postgres URL, else a SQLite Store for the path."""
+    if str(target).startswith(("postgres://", "postgresql://")):
+        from .storage_pg import PostgresStore  # imported late: psycopg is optional
+
+        return PostgresStore(str(target))
+    return Store(target)
 
 
 class Store:

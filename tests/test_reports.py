@@ -16,7 +16,7 @@ from prismunfold.edition import agent_edition
 from prismunfold.linkcheck import check_story, http_probe, is_public_host
 from prismunfold.plan import load_topics
 from prismunfold.reports import ReportError, load_reports, parse_report
-from prismunfold.storage import Store
+from prismunfold.storage import Store, open_store
 
 REPORT = {
     "schema_version": 1,
@@ -219,7 +219,7 @@ class ExportAndCliTest(unittest.TestCase):
             args = ["reports", "--config", "", "--db", f"{tmp}/db.sqlite3", "--site", f"{tmp}/site",
                     "--reports-dir", f"{tmp}/out"]
             main(args)
-            store = Store(f"{tmp}/db.sqlite3")
+            store = open_store(f"{tmp}/db.sqlite3")
             self.assertEqual(len(store.all_stories()), 2)
             store.close()
             self.assertEqual(main(args), 1)  # rejected reports stay visible on every run

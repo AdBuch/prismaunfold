@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -21,7 +22,7 @@ from .models import Source
 from .plan import load_topics, write_plan
 from .pipeline import load_catalog, load_config, run
 from .reports import load_reports
-from .storage import Store
+from .storage import open_store
 
 
 def _parse_now(value: str | None) -> datetime:
@@ -38,10 +39,15 @@ def _fixture_fetcher(directory: str):
     return fetch
 
 
+def _open(args: argparse.Namespace, cfg: dict):
+    """--db wins, then the DATABASE_URL environment variable, then db_path from the config."""
+    return open_store(args.db or os.environ.get("DATABASE_URL") or cfg["db_path"])
+
+
 def _run(args: argparse.Namespace, cfg: dict) -> int:
     catalog = load_catalog(args.catalog or cfg["catalog_path"])
     fetch = _fixture_fetcher(args.fixtures) if args.fixtures else fetch_feed
-    store = Store(args.db or cfg["db_path"])
+    store = _open(args, cfg)
     try:
         report = run(cfg, catalog, _parse_now(args.now), fetch, store, args.site or cfg["site_dir"])
     finally:
@@ -59,7 +65,7 @@ def _run(args: argparse.Namespace, cfg: dict) -> int:
 
 
 def _context(args: argparse.Namespace, cfg: dict) -> int:
-    store = Store(args.db or cfg["db_path"])
+    store = _open(args, cfg)
     try:
         text = prior_coverage(store, args.topic, args.language, args.limit)
     finally:
@@ -77,7 +83,7 @@ def _plan(args: argparse.Namespace, cfg: dict) -> int:
         return 0
     jobs = load_topics(args.topics)
     edition = agent_edition(_parse_now(args.now))
-    store = Store(args.db or cfg["db_path"])
+    store = _open(args, cfg)
     try:
         path = write_plan(store, jobs, edition, args.shared_dir)
     finally:
@@ -96,7 +102,7 @@ def _reports(args: argparse.Namespace, cfg: dict) -> int:
     else:
         editions = [args.edition]
     results = [r for edition in editions for r in load_reports(args.reports_dir, edition)]
-    store = Store(args.db or cfg["db_path"])
+    store = _open(args, cfg)
     accepted = rejected = known = 0
     try:
         for path, story, problems in results:
@@ -129,7 +135,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--config", default="config/config.json")
-    common.add_argument("--db", help="override db_path from the config")
+    common.add_argument("--db", help="SQLite file or postgresql:// URL (default: $DATABASE_URL, then config)")
     common.add_argument("--site", help="override site_dir from the config")
 
     run_cmd = sub.add_parser("run", parents=[common], help="ingest feeds and export one edition")

@@ -9,7 +9,8 @@
 # With arguments, run the prismunfold CLI once instead:  docker compose run --rm pipeline plan
 set -u
 
-DB="${DB_PATH:-/data/prismunfold.sqlite3}"
+# DATABASE_URL (postgresql://...) selects PostgreSQL; without it a SQLite file is used.
+DB="${DATABASE_URL:-${DB_PATH:-/data/prismunfold.sqlite3}}"
 SITE="${SITE_DIR:-/site}"
 cli() { command="$1"; shift; python3 -m prismunfold "$command" --db "$DB" --site "$SITE" "$@"; }
 

@@ -114,6 +114,7 @@ curl http://localhost:8080/api/v1/index.json
 | --- | --- |
 | `pipeline` | Every 10 minutes: plans the current 6-hour edition, checks the agents' reports, keeps the archive, exports JSON |
 | `codex`, `claude`, `vibe`, `goose` | One writer each. Reads the job list, writes one report per topic. Idle without credentials |
+| `db` | PostgreSQL: stories, archive search index, feed articles. Reachable only by the pipeline |
 | `web` | Serves the exported JSON on port 8080 |
 | `volumes-init` | Sets volume permissions once, then exits |
 
@@ -133,7 +134,10 @@ docker compose down                           # stop; add -v to delete all data
 Status: CI builds all images and runs the stack with a stand-in agent
 (`.github/workflows/ci.yml`). A run with real agents and API keys has not happened
 yet; see `collectors/README.md` for the open points. The frontend is not part of
-this setup yet, and storage is SQLite on a volume, not PostgreSQL.
+this setup yet.
+
+Set `POSTGRES_PASSWORD` in `.env` before the first start; the default is only acceptable
+on a machine nobody else can reach. Without Docker, the pipeline falls back to a SQLite file.
 
 ## MVP (Phase 1) quickstart
 
@@ -158,7 +162,7 @@ PYTHONPATH=src python3 -m prismunfold run \
 PYTHONPATH=src python3 -m prismunfold run
 ```
 
-Output lands in `site/api/v1/` as static JSON; the pipeline renders no HTML. The SQLite store is `data/prismunfold.sqlite3`. Both directories are git-ignored.
+Output lands in `site/api/v1/` as static JSON; the pipeline renders no HTML. Without `DATABASE_URL` the store is the SQLite file `data/prismunfold.sqlite3`; with `DATABASE_URL=postgresql://...` (and `pip install "psycopg[binary]"`) it is PostgreSQL. `data/` and `site/` are git-ignored.
 
 | File | Content |
 | --- | --- |
@@ -171,7 +175,7 @@ Output lands in `site/api/v1/` as static JSON; the pipeline renders no HTML. The
 
 - A report is untrusted input. A sentence without a well-formed http(s) source URL is dropped; a report with no sourced sentence, an unknown agent or a mismatching edition is rejected, and `reports` exits with code 1.
 - With `--check-links`, every cited URL is opened; sources that do not answer are removed and sentences left without a source are dropped. Only public hosts are contacted. This catches invented links, not a real page that fails to support the sentence.
-- Every accepted story is added to a search index (SQLite FTS5, keyword ranking). `context` retrieves earlier stories on a topic and the collectors append them to the agent prompt. Embeddings can replace the keyword search later.
+- Every accepted story is added to a search index (keyword ranking; a tsvector column in PostgreSQL, FTS5 in SQLite). `context` retrieves earlier stories on a topic and the collectors append them to the agent prompt. Embeddings can replace the keyword search later.
 - A story is never labelled as verified: confidence is `reported`, or `disputed` when uncertainties are listed.
 
 ### What the MVP does

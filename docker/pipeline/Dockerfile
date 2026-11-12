@@ -2,7 +2,9 @@
 # Build from the repository root: docker build -f docker/pipeline/Dockerfile -t prismunfold/pipeline .
 FROM python:3.12-slim-bookworm
 
-RUN useradd --create-home --uid 1000 pipeline \
+# psycopg is the only dependency outside the standard library (PostgreSQL driver).
+RUN pip install --no-cache-dir "psycopg[binary]>=3.2,<4" \
+ && useradd --create-home --uid 1000 pipeline \
  && mkdir -p /app /data /site /out /shared && chown pipeline:pipeline /app /data /site /out /shared
 
 WORKDIR /app

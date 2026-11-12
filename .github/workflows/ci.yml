@@ -20,13 +20,33 @@ jobs:
       fail-fast: false
       matrix:
         python: ["3.11", "3.12"]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 3s --health-retries 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      - name: Unit tests
+      - name: Unit tests (SQLite, standard library only)
         run: PYTHONPATH=src python -m unittest discover -s tests -v
+      - name: Install PostgreSQL driver
+        run: pip install "psycopg[binary]>=3.2,<4"
+      - name: Unit tests again with PostgreSQL
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+        run: |
+          PYTHONPATH=src python -m unittest discover -s tests -v 2>&1 | tee test.log
+          # The PostgreSQL tests must really have run, not been skipped.
+          ! grep -q "TEST_DATABASE_URL is not set" test.log
+          grep -q "PostgresStoreTest" test.log
 
   scripts:
     name: Shell scripts and compose files
@@ -109,6 +129,12 @@ jobs:
           test "$(jq '.sentences | length' story.json)" = "1"
           test "$(jq -r '.byline' story.json)" = "Claude Code"
           curl -fsS http://localhost:8080/healthz
+
+      - name: The story is stored in PostgreSQL
+        run: |
+          docker compose exec -T db psql -U prismunfold -d prismunfold -At \
+            -c "SELECT agent, language, headline FROM stories" | tee stories.txt
+          test "$(wc -l < stories.txt)" = "1"
 
       - name: Logs
         if: always()

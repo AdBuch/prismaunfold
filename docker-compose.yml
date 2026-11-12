@@ -9,13 +9,15 @@
 # codex, claude, vibe, goose
 #            one writer each; picks up the job list and writes one report per topic.
 #            An agent without credentials in .env logs that and stays idle.
+# db         PostgreSQL: stories, archive search index, feed articles
 # web        serves the exported JSON on port 8080
 #
 # Containers talk only through volumes:
 #   shared   pipeline -> collectors   job list and prior coverage     (collectors: read-only)
 #   reports  collectors -> pipeline   one JSON report per agent and topic
 #   site     pipeline -> web          exported JSON                    (web: read-only)
-#   data     pipeline only            SQLite store and archive index
+#   pgdata   db only                  PostgreSQL data
+# Only the pipeline talks to the database; it is not published on a host port.
 
 x-collector: &collector
   env_file: .env
@@ -34,30 +36,46 @@ services:
   # Named volumes start out owned by root; the services run as unprivileged users.
   volumes-init:
     image: busybox:stable
-    command: ["sh", "-c", "chmod 1777 /out && chown 1000:1000 /data /site /shared"]
+    command: ["sh", "-c", "chmod 1777 /out && chown 1000:1000 /site /shared"]
     volumes:
       - reports:/out
-      - data:/data
       - site:/site
       - shared:/shared
     restart: "no"
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: prismunfold
+      POSTGRES_DB: prismunfold
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-prismunfold}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prismunfold -d prismunfold"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
 
   pipeline:
     image: prismunfold/pipeline
     build: { context: ., dockerfile: docker/pipeline/Dockerfile }
     environment:
+      DATABASE_URL: postgresql://prismunfold:${POSTGRES_PASSWORD:-prismunfold}@db:5432/prismunfold
       PIPELINE_INTERVAL: ${PIPELINE_INTERVAL:-600}
       CHECK_LINKS: ${CHECK_LINKS:-1}
     volumes:
       - ./config:/app/config:ro
       - ./catalog:/app/catalog:ro
-      - data:/data
       - site:/site
       - shared:/shared
       - reports:/out:ro
     depends_on:
       volumes-init:
         condition: service_completed_successfully
+      db:
+        condition: service_healthy
     restart: unless-stopped
 
   codex:
@@ -93,7 +111,7 @@ services:
     restart: unless-stopped
 
 volumes:
-  data:
+  pgdata:
   site:
   shared:
   reports:
