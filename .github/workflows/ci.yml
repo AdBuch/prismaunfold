@@ -133,7 +133,7 @@ jobs:
       - name: The story is stored in PostgreSQL
         run: |
           docker compose exec -T db psql -U prismunfold -d prismunfold -At \
-            -c "SELECT agent, language, headline FROM stories" | tee stories.txt
+            -c "SELECT agent, language, data->>'headline' FROM stories" | tee stories.txt
           test "$(wc -l < stories.txt)" = "1"
 
       - name: Logs
