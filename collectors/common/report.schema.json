@@ -42,6 +42,7 @@
         }
       }
     },
-    "uncertainties": { "type": "array", "items": { "type": "string" } }
+    "uncertainties": { "type": "array", "items": { "type": "string" }, "description": "What is not known or rests on one source." },
+    "disputes": { "type": "array", "items": { "type": "string" }, "description": "Points on which sources contradict each other. Name both versions." }
   }
 }

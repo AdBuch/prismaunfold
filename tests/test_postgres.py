@@ -20,7 +20,7 @@ from prismunfold.models import Article
 from prismunfold.reports import parse_report
 from prismunfold.storage import Store, open_store
 
-from test_reports import REPORT, report
+from test_reports import NOW, REPORT, report
 
 URL = os.environ.get("TEST_DATABASE_URL")
 
@@ -109,17 +109,20 @@ class PostgresStoreTest(unittest.TestCase):
             path.write_text(json.dumps(report(agent="goose", headline="Third voice")), encoding="utf-8")
             os.environ["DATABASE_URL"] = URL
             try:
-                code = main(["reports", "--config", "", "--site", f"{tmp}/site", "--reports-dir", f"{tmp}/out"])
+                code = main(["reports", "--config", "", "--site", f"{tmp}/site",
+                             "--reports-dir", f"{tmp}/out", "--now", NOW])
             finally:
                 del os.environ["DATABASE_URL"]
             self.assertEqual(code, 0)
             self.assertEqual(len(self.store.all_stories()), 3)
-            edition = json.loads((Path(tmp) / "site/api/v1/editions/2026-11-12T18.json").read_text(encoding="utf-8"))
-            by_topic = {t["topicSlug"]: t["stories"] for t in edition["topics"]}
-            # claude and goose wrote about the same topic, codex about another one
-            self.assertEqual({s["agent"] for s in by_topic["swiss-energy-policy"]}, {"claude", "goose"})
-            self.assertEqual([s["agent"] for s in by_topic["alpine-tourism"]], ["codex"])
-
+            api = Path(tmp) / "site/api/v1"
+            editions = json.loads((api / "editions.json").read_text(encoding="utf-8"))
+            self.assertEqual([e["date"] for e in editions], ["2026-11-12"])
+            self.assertEqual(len(editions[0]["placements"]), 3)
+            self.assertEqual(self.store.daily_editions()["2026-11-12"]["date"], "2026-11-12")
+            story = self.store.get_story(self.first.id)
+            self.assertEqual(story, self.first)
+            self.assertIsNone(self.store.get_story("missing"))
 
 if __name__ == "__main__":
     unittest.main()

@@ -129,6 +129,15 @@ class PostgresStore:
             ),
         )
 
+    def daily_editions(self) -> dict[str, dict]:
+        """Stored daily editions by date (YYYY-MM-DD)."""
+        rows = self.db.execute("SELECT id, data FROM editions WHERE id LIKE 'daily|%%'").fetchall()
+        return {row[0].split("|", 1)[1]: row[1] for row in rows}
+
+    def get_story(self, story_id: str) -> Story | None:
+        row = self.db.execute("SELECT data FROM stories WHERE id = %s", (story_id,)).fetchone()
+        return story_from_dict(row[0]) if row else None
+
     def has_story(self, story_id: str) -> bool:
         return self.db.execute("SELECT 1 FROM stories WHERE id = %s", (story_id,)).fetchone() is not None
 

@@ -1,4 +1,4 @@
-"""One run: ingest -> editorial gate -> cluster -> summarise -> translate -> rank -> export JSON."""
+"""One feed run: ingest -> editorial gate -> cluster -> summarise -> rank -> desk stories -> export."""
 
 from __future__ import annotations
 
@@ -10,13 +10,14 @@ from pathlib import Path
 from typing import Callable
 
 from .cluster import cluster_articles
-from .edition import edition_label, edition_window
+from .desk import changed, story_from_event, story_id_for
+from .edition import edition_window
 from .ingest import fetch_feed, parse_feed
-from .models import Article, Event, Source, Summary, to_jsonable
+from .models import Article, Event, Source, Summary
 from .normalize import sha1_id, title_key
 from .quality import rejection_reason
 from .rank import score, select
-from .export import export_briefing
+from .export import export_site
 from .storage import Store
 from .summarize import ExtractiveSummarizer, NoTranslator, NotConfigured, validate_summary
 
@@ -46,6 +47,7 @@ class RunReport:
     events: int = 0
     dropped: list[tuple[str, str]] = field(default_factory=list)
     dropped_sentences: int = 0
+    stories: int = 0
     errors: list[str] = field(default_factory=list)
     editions: list[str] = field(default_factory=list)
 
@@ -181,20 +183,17 @@ def run(
     chosen = select(scored, cfg["max_events_per_edition"], cfg["max_events_per_topic"])
     report.events = len(chosen)
 
-    # 5. Export JSON for the frontend.
-    label = edition_label(start, tz_name)
-    pages: dict[str, list[tuple[Event, Summary, list[Article]]]] = {}
+    # 5. Each chosen event becomes (or updates) a desk story in the shared story model.
     for event in chosen:
-        arts = [articles_by_id[i] for i in event.article_ids]
-        pages.setdefault(event.language, []).append((event, summaries[event.id], arts))
-    export_briefing(Path(site_dir), pages, label, start, end, now, tz_name, names)
-    for lang, items in pages.items():
-        store.save_edition(
-            f"{lang}|{start.isoformat()}",
-            lang,
-            now,
-            {"edition": label, "events": [to_jsonable(e) for e, _, _ in items]},
-        )
+        group = [articles_by_id[i] for i in event.article_ids]
+        previous = store.get_story(story_id_for(group))
+        story = story_from_event(event, summaries[event.id], group, sources, now, previous)
+        if story.sentences and changed(story, previous):
+            store.save_story(story)
+            report.stories += 1
     store.commit()
-    report.editions = sorted(pages)
+
+    # 6. Export JSON for the frontend: feed stories and agent stories together.
+    export_site(store, Path(site_dir), now)
+    report.editions = sorted({e.language for e in chosen})
     return report

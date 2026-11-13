@@ -1,7 +1,7 @@
 """Check that the URLs an agent cites actually exist.
 
-This catches invented links. It does not prove that a page supports the sentence
-citing it; that needs reading the page and is a separate step.
+This answers one question only: does the URL answer? It catches invented links. It
+does not show that the page supports the sentence citing it; see `verification`.
 
 The URLs come from an agent, so they are untrusted: only public http(s) hosts are
 contacted, never loopback, private or link-local addresses. The host is resolved
@@ -32,7 +32,7 @@ def is_public_host(host: str) -> bool:
     """True only if every address the host resolves to is a public one."""
     try:
         infos = socket.getaddrinfo(host, None)
-    except OSError:
+    except (OSError, UnicodeError):
         return False
     addresses = {info[4][0] for info in infos}
     return bool(addresses) and all(ipaddress.ip_address(a).is_global for a in addresses)
@@ -66,28 +66,36 @@ def http_probe(url: str) -> bool:
     return False
 
 
-def check_story(story: Story, probe: Probe = http_probe) -> tuple[Story | None, list[str]]:
-    """Remove dead source URLs; drop sentences left without a source.
+@dataclasses.dataclass(frozen=True)
+class LinkCheck:
+    story: Story | None  # None when no sentence kept a reachable source
+    reachable: dict[str, bool]  # every URL the story cited, before pruning
+    dropped_sentences: int
+    problems: list[str]
 
-    Returns (None, problems) when no sentence survives.
-    """
+
+def check_story(story: Story, probe: Probe = http_probe) -> LinkCheck:
+    """Remove dead source URLs and drop sentences left without a source."""
     urls = list(dict.fromkeys(u for s in story.sentences for u in s.source_urls))
-    alive = {u for u in urls if probe(u)}
-    problems = [f"source does not answer, removed: {u}" for u in urls if u not in alive]
+    reachable = {u: bool(probe(u)) for u in urls}
+    problems = [f"source does not answer, removed: {u}" for u in urls if not reachable[u]]
 
     sentences = []
+    dropped = 0
     for position, sentence in enumerate(story.sentences, start=1):
-        kept = tuple(u for u in sentence.source_urls if u in alive)
+        kept = tuple(u for u in sentence.source_urls if reachable[u])
         if kept:
             sentences.append(dataclasses.replace(sentence, source_urls=kept))
         else:
+            dropped += 1
             problems.append(f"sentence {position}: no reachable source, dropped")
 
     if not sentences and not story.nothing_new:
-        return None, problems + ["rejected: no sentence with a reachable source is left"]
+        problems.append("rejected: no sentence with a reachable source is left")
+        return LinkCheck(None, reachable, dropped, problems)
     checked = dataclasses.replace(
         story,
         sentences=tuple(sentences),
-        sources=tuple(s for s in story.sources if s.url in alive),
+        sources=tuple(s for s in story.sources if reachable.get(s.url)),
     )
-    return checked, problems
+    return LinkCheck(checked, reachable, dropped, problems)

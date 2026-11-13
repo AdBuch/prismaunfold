@@ -177,13 +177,34 @@ class PipelineTest(unittest.TestCase):
             self.assertTrue(any("older" in r for r in reasons))
             self.assertTrue(any("duplicate title" in r for r in reasons))
 
-            site = Path(tmp) / "site"
-            data = json.loads((site / "api/v1/briefings/de/latest.json").read_text(encoding="utf-8"))
-            titles = [item["event"]["title"] for item in data["events"]]
-            self.assertIn("Zürcher Kantonsrat debattiert Velowege", titles)
-            self.assertTrue(any(item["event"]["single_source"] for item in data["events"]))
-            self.assertTrue(all(item["summary"]["translations_pending"] for item in data["events"]))
-            self.assertEqual(list(site.rglob("*.html")), [])  # the pipeline renders no HTML
+            site = Path(tmp) / "site" / "api" / "v1"
+            editions = json.loads((site / "editions.json").read_text(encoding="utf-8"))
+            self.assertEqual(len(editions), 1)
+            headlines = [p["snapshot"]["headline"] for p in editions[0]["placements"]]
+            self.assertIn("Zürcher Kantonsrat debattiert Velowege", headlines)
+            for placement in editions[0]["placements"]:
+                story = json.loads((site / "stories" / f"{placement['storySlug']}.json").read_text(encoding="utf-8"))
+                self.assertEqual(story["agent"], "desk")
+                self.assertTrue(story["sources"])
+                # Extractive sentences are supported by the article they are taken from.
+                self.assertTrue(all(s["verification"]["support"] == "supported" for s in story["sentences"]))
+                self.assertTrue(all(s["sourceIds"] for s in story["sentences"]))
+            states = {p["verificationState"] for p in editions[0]["placements"]}
+            self.assertIn("review_required", states)  # the single-publisher event is flagged
+            self.assertEqual(list((Path(tmp) / "site").rglob("*.html")), [])  # no HTML from the pipeline
+
+    def test_second_run_updates_instead_of_republishing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = {**DEFAULTS, "db_path": f"{tmp}/db.sqlite3", "site_dir": f"{tmp}/site"}
+            store = Store(cfg["db_path"])
+            catalog = load_catalog(FIXTURES / "catalog.json")
+            first = run(cfg, catalog, NOW, fetch_fixture, store, cfg["site_dir"])
+            again = run(cfg, catalog, NOW, fetch_fixture, store, cfg["site_dir"])
+            stories = store.all_stories()
+            store.close()
+            self.assertEqual(first.stories, 2)
+            self.assertEqual(again.stories, 0)  # nothing new: nothing is written again
+            self.assertEqual(len(stories), 2)
 
     def test_blocked_source_is_not_fetched(self):
         calls = []

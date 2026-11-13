@@ -9,15 +9,17 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .archive import prior_coverage
 from .edition import agent_edition
-from .export import export_stories
+from .export import export_site
 from .ingest import fetch_feed
 from .linkcheck import check_story
+from .verification import verify_story
 from .models import Source
 from .plan import load_topics, write_plan
 from .pipeline import load_catalog, load_config, run
@@ -55,7 +57,8 @@ def _run(args: argparse.Namespace, cfg: dict) -> int:
 
     print(
         f"fetched={report.fetched} kept={report.kept} events={report.events} "
-        f"dropped_sentences={report.dropped_sentences} editions={','.join(report.editions) or 'none'}"
+        f"stories_written={report.stories} dropped_sentences={report.dropped_sentences} "
+        f"languages={','.join(report.editions) or 'none'}"
     )
     for title, reason in report.dropped:
         print(f"  dropped: {title!r} ({reason})")
@@ -94,14 +97,14 @@ def _plan(args: argparse.Namespace, cfg: dict) -> int:
 
 def _reports(args: argparse.Namespace, cfg: dict) -> int:
     """Exit code 1 when at least one report was rejected, so a scheduler notices."""
-    now = _parse_now(None)
+    now = _parse_now(args.now)
     if args.edition == "current":
         editions: list[str | None] = [agent_edition(now)]
     elif args.edition == "recent":  # a report may arrive after its edition has ended
         editions = [agent_edition(now - timedelta(hours=6)), agent_edition(now)]
     else:
         editions = [args.edition]
-    results = [r for edition in editions for r in load_reports(args.reports_dir, edition)]
+    results = [r for edition in editions for r in load_reports(args.reports_dir, edition, now)]
     store = _open(args, cfg)
     accepted = rejected = known = 0
     try:
@@ -109,18 +112,28 @@ def _reports(args: argparse.Namespace, cfg: dict) -> int:
             if story is not None and not args.force and store.has_story(story.id):
                 known += 1  # already checked and published; do not probe its links again
                 continue
+            # Sentences already lost for lack of a usable source count against the story.
+            dropped = sum("dropped" in p and p.startswith("sentence") for p in problems)
+            reachable = None
+            dead = 0
             if story is not None and args.check_links:
-                story, link_problems = check_story(story)
-                problems = problems + link_problems
+                check = check_story(story)
+                story, reachable = check.story, check.reachable
+                dropped += check.dropped_sentences
+                dead = sum(not ok for ok in check.reachable.values())
+                problems = problems + check.problems
+                if story is not None:  # only reachable sources are left on the story
+                    reachable = {u: True for s in story.sentences for u in s.source_urls}
             if story is None:
                 rejected += 1
             else:
                 accepted += 1
-                store.save_story(story)
+                record = verify_story(story, reachable, dropped_sentences=dropped, dead_sources=dead)
+                store.save_story(dataclasses.replace(story, verification=record))
             for problem in problems:
                 print(f"  {path}: {problem}")
         store.commit()
-        written = export_stories(store, args.site or cfg["site_dir"])
+        written = export_site(store, args.site or cfg["site_dir"], now)
     finally:
         store.close()
     print(
@@ -157,6 +170,7 @@ def main(argv: list[str] | None = None) -> int:
     rep_cmd = sub.add_parser("reports", parents=[common], help="check, store and export agent reports")
     rep_cmd.add_argument("--reports-dir", default="collectors/out")
     rep_cmd.add_argument("--edition", help="only this edition; 'current', or 'recent' for current and previous (default: all)")
+    rep_cmd.add_argument("--now", help="ISO 8601 time to judge report age against (default: now)")
     rep_cmd.add_argument("--force", action="store_true", help="re-check reports that are already stored")
     rep_cmd.add_argument(
         "--check-links",

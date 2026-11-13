@@ -20,8 +20,9 @@ what they will write.
 - Use your own words. Do not copy sentences from sources; no quote longer than
   14 words, and at most one quote per source.
 - Do not use paywalled text you could not read. Do not bypass paywalls.
-- Where sources disagree, or only one source reports something, record that in
-  `uncertainties`.
+- What is not known, or reported by one source only, goes into `uncertainties`.
+- Where sources contradict each other, give both versions in `disputes` and do not
+  pick a side in the text.
 - Report what happened, not what to think about it. No recommendations or opinion.
 - Use real publication dates from the sources. Never invent a URL, date, name or figure.
 - Write only the report file. Do not create or change anything else.

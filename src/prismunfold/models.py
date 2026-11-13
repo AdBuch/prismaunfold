@@ -135,7 +135,13 @@ class StorySentence:
 
 @dataclass(frozen=True)
 class Story:
-    """One report by one agent on one topic for one edition."""
+    """One publishable news story with a source for every sentence.
+
+    Two producers share this model: a collector agent's report on a topic
+    (agent = codex, claude, vibe, goose) and the feed desk's extractive summary of
+    an event (agent = desk). Keeping one model means one archive, one verification
+    path and one export for both.
+    """
 
     id: str
     slug: str
@@ -151,17 +157,31 @@ class Story:
     sources: tuple[StorySource, ...]
     uncertainties: tuple[str, ...] = ()
     nothing_new: bool = False
+    disputes: tuple[str, ...] = ()
+    regions: tuple[str, ...] = ()
+    updated_at: datetime | None = None
+    # Result of verification.verify_story, stored so an edition shows what was known then.
+    verification: dict[str, Any] | None = None
+
+    @property
+    def day(self) -> str:
+        """Calendar day (UTC) of first publication, YYYY-MM-DD. Edition ids start with it."""
+        return self.edition[:10]
 
 
 def story_from_dict(d: dict[str, Any]) -> Story:
+    updated = d.get("updated_at")
     return Story(
         **{
             **d,
             "created_at": datetime.fromisoformat(d["created_at"]),
+            "updated_at": datetime.fromisoformat(updated) if updated else None,
             "sentences": tuple(
                 StorySentence(s["text"], tuple(s["source_urls"])) for s in d["sentences"]
             ),
             "sources": tuple(StorySource(**s) for s in d["sources"]),
             "uncertainties": tuple(d.get("uncertainties", ())),
+            "disputes": tuple(d.get("disputes", ())),
+            "regions": tuple(d.get("regions", ())),
         }
     )

@@ -1,9 +1,11 @@
-"""Tests for collector reports, the archive and the JSON export. Standard library only."""
+"""Contract tests for collector reports: what is accepted, what is rejected, and that
+hostile input cannot hurt the pipeline. Standard library only."""
 
 from __future__ import annotations
 
 import copy
 import json
+import os
 import tempfile
 import unittest
 from datetime import datetime, timezone
@@ -11,12 +13,21 @@ from pathlib import Path
 
 from prismunfold.archive import prior_coverage, related_stories
 from prismunfold.cli import main
-from prismunfold.export import export_stories
 from prismunfold.edition import agent_edition
 from prismunfold.linkcheck import check_story, http_probe, is_public_host
 from prismunfold.plan import load_topics
-from prismunfold.reports import ReportError, load_reports, parse_report
+from prismunfold.reports import (
+    MAX_REPORT_BYTES,
+    MAX_SENTENCES,
+    ReportError,
+    load_reports,
+    parse_report,
+    public_url,
+)
 from prismunfold.storage import Store, open_store
+
+NOW = "2026-11-12T19:00:00+00:00"
+NOW_DT = datetime.fromisoformat(NOW)
 
 REPORT = {
     "schema_version": 1,
@@ -73,12 +84,17 @@ class ParseReportTest(unittest.TestCase):
     def test_wrong_agent_schema_and_edition_are_rejected(self):
         for bad in (
             report(agent="mallory"),
+            report(agent="desk"),  # the pipeline's own desk can never arrive as a report
             report(schema_version=2),
+            report(schema_version=True),
             report(edition="../../etc"),
             report(created_at="yesterday"),
+            report(language="en; DROP"),
             "not an object",
+            ["a", "list"],
+            None,
         ):
-            with self.assertRaises(ReportError):
+            with self.assertRaises(ReportError, msg=repr(bad)[:60]):
                 parse_report(bad)
         with self.assertRaises(ReportError):
             parse_report(REPORT, expected_agent="codex")
@@ -90,25 +106,150 @@ class ParseReportTest(unittest.TestCase):
         self.assertEqual(len(story.sources), 2)
         self.assertTrue(any("not in the source list" in p for p in problems))
 
-    def test_single_publisher_is_named_as_uncertainty(self):
-        one = report(sentences=REPORT["sentences"][:1])
-        story, _ = parse_report(one)
-        self.assertTrue(any("single publisher" in u for u in story.uncertainties))
+    def test_disputes_and_uncertainties_are_kept_apart(self):
+        story, _ = parse_report(report(uncertainties=["Turnout is not known."],
+                                       disputes=["Outlets give different vote counts."]))
+        self.assertEqual(story.uncertainties, ("Turnout is not known.",))
+        self.assertEqual(story.disputes, ("Outlets give different vote counts.",))
+
+
+class AdversarialReportTest(unittest.TestCase):
+    """Every field with the wrong type. Nothing may raise anything but ReportError."""
+
+    WRONG = (None, 0, 1.5, True, "text", [], ["x"], {}, {"a": 1}, [[]], [None], [{"text": 1}])
+
+    def test_wrong_types_never_crash(self):
+        for field in REPORT:
+            for value in self.WRONG:
+                try:
+                    story, _ = parse_report(report(**{field: value}))
+                except ReportError:
+                    continue
+                self.assertTrue(story.sentences or story.nothing_new, f"{field}={value!r}")
+                for sentence in story.sentences:
+                    self.assertTrue(sentence.text)
+                    self.assertTrue(sentence.source_urls)
+
+    def test_wrong_types_inside_sentences_and_sources_never_crash(self):
+        for value in self.WRONG:
+            sentences = [{"text": value, "source_urls": ["https://a.example.org/1"]},
+                         {"text": "Kept.", "source_urls": value},
+                         value,
+                         {"text": "Good.", "source_urls": ["https://a.example.org/1", value]}]
+            sources = [value, {"url": value, "title": value, "publisher": value,
+                               "published_at": value, "language": value}]
+            story, _ = parse_report(report(sentences=sentences, sources=sources, uncertainties=[value]))
+            # A plain string is a legitimate sentence text; every other type is dropped.
+            expected = (["text"] if value == "text" else []) + ["Good."]
+            self.assertEqual([s.text for s in story.sentences], expected, repr(value))
+
+    def test_unsafe_urls_are_never_accepted(self):
+        for url in (
+            "javascript:alert(1)", "file:///etc/passwd", "data:text/html,x", "ftp://example.org/x",
+            "http://localhost/admin", "http://127.0.0.1/", "http://[::1]/", "http://169.254.169.254/latest",
+            "http://10.0.0.8/x", "https://user:secret@example.org/", "https://example.org:99999/x",
+            "https://exa mple.org/", "https://example.org/\npath", "https://intranet/", "https://example./",
+            "//example.org/x", "", " ", "https://" + "a" * 3000 + ".org/",
+        ):
+            self.assertIsNone(public_url(url), url)
+        self.assertEqual(public_url("HTTPS://Example.org/a?utm_source=x"), "https://example.org/a")
+
+    def test_oversized_report_is_cut_down_not_trusted(self):
+        many = [{"text": f"Sentence {i} " + "x" * 5000, "source_urls": ["https://a.example.org/1"] * 50}
+                for i in range(500)]
+        story, problems = parse_report(report(sentences=many, sources=[{"url": f"https://s{i}.example.org/"}
+                                                                       for i in range(500)]))
+        self.assertEqual(len(story.sentences), MAX_SENTENCES)
+        self.assertTrue(all(len(s.text) <= 600 for s in story.sentences))
+        self.assertTrue(any("kept the first" in p for p in problems))
+
+    def test_control_characters_and_markup_are_removed_from_text(self):
+        story, _ = parse_report(report(headline="Break\x00ing\x1b[31m <script>alert(1)</script>‮news"))
+        self.assertNotIn("\x00", story.headline)
+        self.assertNotIn("\x1b", story.headline)
+        self.assertNotIn("‮", story.headline)
+        self.assertNotIn("<", story.headline)
+
+    def test_timestamps_are_checked_against_now(self):
+        parse_report(REPORT, now=NOW_DT)
+        for created in ("2026-11-12T20:00:00Z", "2031-01-01T00:00:00Z", "2026-11-01T00:00:00Z"):
+            with self.assertRaises(ReportError, msg=created):
+                parse_report(report(created_at=created), now=NOW_DT)
+        future_source = report(sources=[{"url": "https://news.example.org/solar", "published_at": "2030-01-01"},
+                                        {"url": "https://other.example.com/vote", "published_at": "soon"}])
+        story, _ = parse_report(future_source, now=NOW_DT)
+        self.assertEqual([s.published_at for s in story.sources], [None, None])
+
+    def test_slug_and_ids_are_safe_file_names(self):
+        story, _ = parse_report(report(headline="../../../etc/passwd \\ ..", topic="a/b\\c:d*e?"))
+        for value in (story.slug, story.topic_slug, story.id):
+            self.assertRegex(value, r"^[\w-]+$")
+
+
+class LoadReportsTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name) / "2026-11-12T18" / "claude"
+        self.dir.mkdir(parents=True)
+        (self.dir / "good.json").write_text(json.dumps(REPORT), encoding="utf-8")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def outcome(self) -> dict[str, str]:
+        return {p.name: ("ok" if s else problems[-1])
+                for p, s, problems in load_reports(self.tmp.name, "2026-11-12T18", NOW_DT)}
+
+    def test_one_bad_file_does_not_stop_the_others(self):
+        (self.dir / "broken.json").write_text("{not json", encoding="utf-8")
+        (self.dir / "binary.json").write_bytes(b"\xff\xfe\x00\x01")
+        (self.dir / "empty.json").write_text("", encoding="utf-8")
+        (self.dir / "nan.json").write_text('{"schema_version": NaN}', encoding="utf-8")
+        (self.dir / "deep.json").write_text("[" * 100000 + "]" * 100000, encoding="utf-8")
+        (self.dir / "huge.json").write_text(" " * (MAX_REPORT_BYTES + 1) + "{}", encoding="utf-8")
+        result = self.outcome()
+        self.assertEqual(result["good.json"], "ok")
+        self.assertEqual(sum(v == "ok" for v in result.values()), 1)
+        self.assertEqual(len(result), 7)
+        self.assertIn("larger than", result["huge.json"])
+        self.assertIn("nested too deeply", result["deep.json"])
+
+    def test_symlinks_and_odd_file_names_are_refused(self):
+        secret = Path(self.tmp.name) / "secret.json"
+        secret.write_text(json.dumps(REPORT), encoding="utf-8")
+        os.symlink(secret, self.dir / "link.json")
+        (self.dir / "odd name;rm.json").write_text(json.dumps(REPORT), encoding="utf-8")
+        result = self.outcome()
+        self.assertIn("not a regular file", result["link.json"])
+        self.assertIn("plain identifier", result["odd name;rm.json"])
+
+    def test_agent_and_edition_must_match_the_directory(self):
+        other = Path(self.tmp.name) / "2026-11-12T18" / "codex"
+        other.mkdir()
+        (other / "spoof.json").write_text(json.dumps(REPORT), encoding="utf-8")  # says "claude"
+        result = self.outcome()
+        self.assertIn("was written by 'codex'", result["spoof.json"])
+
+    def test_edition_argument_cannot_leave_the_reports_directory(self):
+        self.assertEqual(load_reports(self.tmp.name, "../.."), [])
+        self.assertEqual(load_reports(self.tmp.name, "*"), [])
 
 
 class LinkCheckTest(unittest.TestCase):
     def test_dead_sources_are_removed_and_their_sentences_dropped(self):
         story, _ = parse_report(REPORT)
-        checked, problems = check_story(story, probe=lambda url: "news.example.org" in url)
-        self.assertEqual([s.text for s in checked.sentences], [story.sentences[0].text])
-        self.assertEqual([s.url for s in checked.sources], ["https://news.example.org/solar"])
-        self.assertTrue(any("no reachable source" in p for p in problems))
+        check = check_story(story, probe=lambda url: "news.example.org" in url)
+        self.assertEqual([s.text for s in check.story.sentences], [story.sentences[0].text])
+        self.assertEqual([s.url for s in check.story.sources], ["https://news.example.org/solar"])
+        self.assertEqual(check.dropped_sentences, 1)
+        self.assertEqual(check.reachable, {"https://news.example.org/solar": True,
+                                           "https://other.example.com/vote": False})
 
     def test_story_with_only_dead_sources_is_rejected(self):
         story, _ = parse_report(REPORT)
-        checked, problems = check_story(story, probe=lambda url: False)
-        self.assertIsNone(checked)
-        self.assertTrue(problems[-1].startswith("rejected"))
+        check = check_story(story, probe=lambda url: False)
+        self.assertIsNone(check.story)
+        self.assertTrue(check.problems[-1].startswith("rejected"))
 
     def test_private_and_loopback_targets_are_never_contacted(self):
         for host in ("127.0.0.1", "10.0.0.5", "169.254.169.254", "::1", "no-such-host.invalid"):
@@ -164,8 +305,12 @@ class ArchiveTest(unittest.TestCase):
         self.assertEqual(self.store.search_stories('"; DROP TABLE stories; -- NEAR(', "en"), [])
         self.assertEqual(len(self.store.all_stories()), 2)
 
+    def test_story_lookup_by_id(self):
+        self.assertEqual(self.store.get_story(self.first.id), self.first)
+        self.assertIsNone(self.store.get_story("missing"))
 
-class ExportAndCliTest(unittest.TestCase):
+
+class CliTest(unittest.TestCase):
     def write_reports(self, root: Path) -> None:
         files = {
             "claude": REPORT,
@@ -179,67 +324,80 @@ class ExportAndCliTest(unittest.TestCase):
         (root / "2026-11-12T18" / "vibe").mkdir()
         (root / "2026-11-12T18" / "vibe" / "broken.json").write_text("{not json", encoding="utf-8")
 
-    def test_load_reports_marks_rejected_files(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            self.write_reports(Path(tmp))
-            results = load_reports(tmp, "2026-11-12T18")
-            self.assertEqual(sum(story is not None for _, story, _ in results), 2)
-            self.assertEqual(sum(story is None for _, story, _ in results), 2)
+    def args(self, tmp: str) -> list[str]:
+        return ["--config", "", "--db", f"{tmp}/db.sqlite3", "--site", f"{tmp}/site"]
 
-    def test_cli_reports_end_to_end(self):
+    def test_reports_end_to_end(self):
         with tempfile.TemporaryDirectory() as tmp:
             self.write_reports(Path(tmp) / "out")
-            args = ["--config", "", "--db", f"{tmp}/db.sqlite3", "--site", f"{tmp}/site"]
-            code = main(["reports", *args, "--reports-dir", f"{tmp}/out"])
+            code = main(["reports", *self.args(tmp), "--reports-dir", f"{tmp}/out", "--now", NOW])
             self.assertEqual(code, 1)  # two rejected reports must be visible to the scheduler
 
             api = Path(tmp) / "site" / "api" / "v1"
             index = json.loads((api / "index.json").read_text(encoding="utf-8"))
-            self.assertEqual(index["editions"][0]["storyCount"], 2)
-            edition = json.loads((api / "editions" / "2026-11-12T18.json").read_text(encoding="utf-8"))
-            stories = edition["topics"][0]["stories"]
-            self.assertEqual({s["agent"] for s in stories}, {"claude", "codex"})
+            self.assertEqual(index["latest"], "2026-11-12")
+            self.assertEqual(index["storyCount"], 2)
+            self.assertEqual(index["sections"], [{"id": "swiss-energy-policy", "label": "Swiss energy policy"}])
+            editions = json.loads((api / "editions.json").read_text(encoding="utf-8"))
+            placements = editions[0]["placements"]
+            self.assertEqual([p["slot"] for p in placements], ["lead", "secondary"])
 
-            story = json.loads((api / "stories" / f"{stories[0]['slug']}.json").read_text(encoding="utf-8"))
-            self.assertEqual(story["relatedSlugs"], [stories[1]["slug"]])
-            self.assertIn(story["confidence"], ("reported", "disputed"))
+            story = json.loads((api / "stories" / f"{placements[0]['storySlug']}.json").read_text(encoding="utf-8"))
+            self.assertEqual(story["relatedSlugs"], [placements[1]["storySlug"]])
+            self.assertEqual(story["confidence"], "reported")
             self.assertIn("AI agent", story["aiDisclosure"])
+            # Two sentences were dropped for lack of a source, so the story needs review.
+            self.assertEqual(story["verification"]["state"], "review_required")
+            self.assertFalse(story["verification"]["links_checked"])
             source_ids = {s["id"] for s in story["sources"]}
             for sentence in story["sentences"]:
                 self.assertTrue(sentence["sourceIds"])
                 self.assertTrue(set(sentence["sourceIds"]) <= source_ids)
+                self.assertEqual(sentence["verification"]["support"], "not_checked")
+
+            topic = json.loads((api / "topics" / "swiss-energy-policy.json").read_text(encoding="utf-8"))
+            self.assertEqual(len(topic["events"]), 2)
+            self.assertEqual(json.loads((api / "magazines.json").read_text(encoding="utf-8")), [])
+            self.assertEqual(list(api.rglob("*.tmp")), [])
 
             out = Path(tmp) / "prior.md"
-            self.assertEqual(main(["context", *args, "--topic", "Swiss energy policy", "--out", str(out)]), 0)
+            self.assertEqual(main(["context", *self.args(tmp), "--topic", "Swiss energy policy", "--out", str(out)]), 0)
             self.assertIn("Solar bill reaches parliament", out.read_text(encoding="utf-8"))
 
     def test_second_run_skips_known_reports(self):
         with tempfile.TemporaryDirectory() as tmp:
             self.write_reports(Path(tmp) / "out")
-            args = ["reports", "--config", "", "--db", f"{tmp}/db.sqlite3", "--site", f"{tmp}/site",
-                    "--reports-dir", f"{tmp}/out"]
+            args = ["reports", *self.args(tmp), "--reports-dir", f"{tmp}/out", "--now", NOW]
             main(args)
             store = open_store(f"{tmp}/db.sqlite3")
             self.assertEqual(len(store.all_stories()), 2)
             store.close()
             self.assertEqual(main(args), 1)  # rejected reports stay visible on every run
 
+    def test_stale_reports_are_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.write_reports(Path(tmp) / "out")
+            code = main(["reports", *self.args(tmp), "--reports-dir", f"{tmp}/out", "--now", "2026-12-24T00:00:00Z"])
+            self.assertEqual(code, 1)
+            index = json.loads((Path(tmp) / "site/api/v1/index.json").read_text(encoding="utf-8"))
+            self.assertEqual(index["storyCount"], 0)
+            self.assertIsNone(index["latest"])
+
     def test_plan_writes_jobs_and_context_for_the_collectors(self):
         with tempfile.TemporaryDirectory() as tmp:
             self.write_reports(Path(tmp) / "out")
-            base = ["--config", "", "--db", f"{tmp}/db.sqlite3", "--site", f"{tmp}/site"]
-            main(["reports", *base, "--reports-dir", f"{tmp}/out"])
+            main(["reports", *self.args(tmp), "--reports-dir", f"{tmp}/out", "--now", NOW])
             topics = Path(tmp) / "topics.txt"
             topics.write_text("# comment\n\nen|Swiss  energy policy\nde|Energiepolitik in Zürich\n"
                               "en|Swiss energy policy\n", encoding="utf-8")
-            code = main(["plan", *base, "--topics", str(topics), "--shared-dir", f"{tmp}/shared",
+            code = main(["plan", *self.args(tmp), "--topics", str(topics), "--shared-dir", f"{tmp}/shared",
                          "--now", "2026-11-13T07:59:00+01:00"])
             self.assertEqual(code, 0)
             lines = (Path(tmp) / "shared/jobs/current.tsv").read_text(encoding="utf-8").splitlines()
             self.assertEqual(lines[0], "#edition 2026-11-13T06")
-            self.assertEqual(lines[1:], [
-                "en-swiss-energy-policy\ten\tSwiss energy policy",
-                "de-energiepolitik-in-zurich\tde\tEnergiepolitik in Zürich",
+            self.assertEqual([line.split("\t")[:3] for line in lines[1:]], [
+                ["en-swiss-energy-policy", "en", "Swiss energy policy"],
+                ["de-energiepolitik-in-zurich", "de", "Energiepolitik in Zürich"],
             ])
             context = Path(tmp) / "shared/context/2026-11-13T06"
             self.assertIn("Solar bill", (context / "en-swiss-energy-policy.md").read_text(encoding="utf-8"))
@@ -260,16 +418,6 @@ class ExportAndCliTest(unittest.TestCase):
         self.assertEqual(agent_edition(datetime(2026, 11, 12, 23, 59, tzinfo=timezone.utc)), "2026-11-12T18")
         self.assertEqual(agent_edition(datetime.fromisoformat("2026-11-13T00:30:00+01:00")), "2026-11-12T18")
         self.assertEqual(agent_edition(datetime(2026, 11, 13, 0, 0, tzinfo=timezone.utc)), "2026-11-13T00")
-
-    def test_export_skips_nothing_new_reports(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            store = Store(f"{tmp}/db.sqlite3")
-            story, _ = parse_report(report(sentences=[], nothing_new=True))
-            store.save_story(story)
-            export_stories(store, f"{tmp}/site")
-            store.close()
-            index = json.loads((Path(tmp) / "site/api/v1/index.json").read_text(encoding="utf-8"))
-            self.assertEqual(index["editions"], [])
 
 
 if __name__ == "__main__":
