@@ -7,3 +7,6 @@ collectors/context/
 .env
 config/topics.txt
 collectors/shared/
+node_modules/
+dist/
+*.log

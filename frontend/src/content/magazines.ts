@@ -1,0 +1,97 @@
+import type { MagazineFeature } from '../models.ts';
+import { AI_NOTE, img, src } from './helpers.ts';
+
+export const magazines: MagazineFeature[] = [
+  {
+    slug: 'the-water-that-remembers',
+    kicker: 'Background · Water',
+    title: 'The Water That Remembers',
+    standfirst:
+      'In a fictional Alpine valley, every field, channel and boundary stone records an old argument about who owns the snowmelt. A reservoir vote forces the valley to read its own history.',
+    byline: 'PrismUnfold Demo Desk',
+    aiDisclosure: AI_NOTE,
+    publishedAt: '2026-11-07T09:00',
+    readingMinutes: 9,
+    hero: img('alpine', 33, 'A high alpine lake and ridge at first light', 'Dawn over the upper basin. Illustration.'),
+    topicSlug: 'valmera-reservoir',
+    relatedStorySlugs: ['valmera-reservoir-vote', 'valmera-reservoir-consultation', 'city-trees-cooling-study'],
+    relatedFeatureSlugs: ['terraces-after-dark'],
+    sources: [
+      src('mag-water-1', 'Alpine Courier', 'Notes on the high channels', '2026-10-28'),
+      src('mag-water-2', 'Example Civic Bulletin', 'Water board charter text', '2026-11-02'),
+    ],
+    demo: true,
+    blocks: [
+      { type: 'p', dropcap: true, text: 'Water in the fictional valley of Valmera does not simply run downhill. It follows agreements, some of them written, many of them remembered, and nearly all of them older than the village road. To walk the high channel in late October is to read a document in stone and moss.' },
+      { type: 'p', text: 'The channel begins at a spring the villagers call the Pale Eye. From there it follows the contour of the slope for four kilometres, crossing three meadows and one old boundary wall. At each crossing, there is a small wooden gate. Each gate has a name, and each name is attached to a family that, at some point, argued for it.' },
+      { type: 'figure', wide: true, image: img('terraces', 18, 'Stone channel threading across a meadow', 'The high channel crosses the upper meadows. Illustration.') },
+      { type: 'h2', text: 'A dry summer reads the margins' },
+      { type: 'p', text: 'This year the margins mattered. By September the village cisterns were nearly empty while the upper meadows, where older rights apply, stayed green. Nobody broke a rule. That, a municipal worker explained to our fictional narrator, was exactly the problem.' },
+      { type: 'pullquote', text: 'Nobody broke a rule. That was exactly the problem.' },
+      { type: 'p', text: 'The reservoir proposal grew out of that September. A single shared basin would not end old arguments, but it would put them on a common ledger: how much water enters, how much is released, and who decides.' },
+      { type: 'sidebar', title: 'How a snowmelt basin works', text: [
+        'Snow stored on the slopes melts from late spring. Without storage, most of it runs away within weeks.',
+        'A basin catches part of the surge and releases it gradually through summer. The trade-off is evaporation and the loss of the land it covers.',
+      ] },
+      { type: 'chronology', title: 'The valley\'s water rules, in order', steps: [
+        { label: 'Long ago', text: 'Meadow families divide the high channel by gate and by hours of flow. The rules are spoken, not written.' },
+        { label: 'Early 20th century (fictional)', text: 'The village writes its first water register after a dispute over a broken gate.' },
+        { label: 'Past decade', text: 'Three summers of low flow stretch the register\'s assumptions.' },
+        { label: 'This autumn', text: 'A consultation, a charter and a municipal vote.' },
+      ] },
+      { type: 'h2', text: 'The case for pooling, and the case against' },
+      { type: 'p', text: 'Supporters speak about resilience. A basin shared by three valleys would smooth out the dry years of any single one. Opponents speak about control. If a three-member board opens the gates, they ask, who decides when the board disagrees?' },
+      { type: 'p', text: 'The charter answers with a monthly published schedule and a ten-year guarantee for existing allocations. It does not answer the harder question of what happens in the eleventh year. That, the drafters concede, is a decision for a future council.' },
+      { type: 'figure', image: img('night', 12, 'Stars above a dark ridge', 'Night above the basin. Illustration.') },
+      { type: 'glossary', terms: [
+        { term: 'Allocation', text: 'A fixed share of water or hours of flow attached to a plot of land.' },
+        { term: 'Release schedule', text: 'The published plan for when and how much water leaves the basin.' },
+        { term: 'Gate', text: 'A wooden barrier that diverts the channel into a meadow.' },
+      ] },
+      { type: 'p', text: 'Whatever the vote decides, the gates will still carry the names of the families who argued for them. The valley, one suspects, will keep reading its water for a long time.' },
+    ],
+  },
+  {
+    slug: 'terraces-after-dark',
+    kicker: 'Background · Highlands',
+    title: 'Terraces After Dark',
+    standfirst:
+      'A fictional Andean valley rebuilds walls its grandparents left behind, one work party at a time, between the harvest and the first frost.',
+    byline: 'PrismUnfold Demo Desk',
+    aiDisclosure: AI_NOTE,
+    publishedAt: '2026-11-08T09:00',
+    readingMinutes: 8,
+    hero: img('terraces', 41, 'Terraced hillside at dusk with lanterns', 'Work parties finish after sunset. Illustration.'),
+    topicSlug: undefined,
+    relatedStorySlugs: ['terrace-restoration-highlands', 'quellca-quechua-science'],
+    relatedFeatureSlugs: ['the-water-that-remembers'],
+    sources: [src('mag-terrace-1', 'Imaginary Andean Review', 'Field visit to the terraces', '2026-11-01')],
+    demo: true,
+    blocks: [
+      { type: 'p', dropcap: true, text: 'The wall is only knee-high when the work party arrives, but by the time the light goes it will have a name. Stones are placed without mortar, each one tested by weight and by the sound it makes against its neighbour. Nobody here uses a plan. They use memory, and memory, it turns out, is a surprisingly reliable surveyor.' },
+      { type: 'p', text: 'This is a fictional valley, but the practice it describes is real in many highland places: terraces that hold soil, slow rain and create small climates for crops. They fail slowly, then all at once, when too few hands remain to repair them.' },
+      { type: 'figure', wide: true, image: img('terraces', 27, 'Rows of stone-walled fields climbing a slope', 'Restored and unrestored terraces side by side. Illustration.') },
+      { type: 'h2', text: 'Work that moves in turns' },
+      { type: 'p', text: 'Work parties rotate: each household sends someone, and each household receives help in return. The arrangement is old and fragile. It depends on enough people being in the valley at the same time, which is precisely what out-migration disturbed.' },
+      { type: 'pullquote', text: 'Memory, it turns out, is a surprisingly reliable surveyor.' },
+      { type: 'sidebar', title: 'Why terraces matter', text: [
+        'A terrace turns a steep slope into a series of level steps, so rain soaks in rather than running off.',
+        'Stone walls store daytime heat and release it at night, protecting crops from light frost.',
+      ] },
+      { type: 'chronology', title: 'A season of repair', steps: [
+        { label: 'After harvest', text: 'Walls are inspected and gaps marked with chalk.' },
+        { label: 'First work parties', text: 'Stones are sorted by size; the largest go to the base.' },
+        { label: 'Before frost', text: 'Soil is replaced behind the wall and left to settle.' },
+        { label: 'Planting season', text: 'Relatives who work elsewhere return for the first sowing.' },
+      ] },
+      { type: 'h2', text: 'What is, and is not, known' },
+      { type: 'p', text: 'Agronomists who visited reported better yields on restored plots. The numbers are anecdotal; nobody has yet measured restored and unrestored terraces under the same conditions. Organisers say they would welcome the comparison, if only to settle an argument in the village.' },
+      { type: 'figure', image: img('night', 20, 'Stars over the valley', 'The valley after the last work party leaves. Illustration.') },
+      { type: 'glossary', terms: [
+        { term: 'Dry-stone wall', text: 'A wall built without mortar, held together by the weight and fit of its stones.' },
+        { term: 'Work party', text: 'A rotating group of households that repair shared structures together.' },
+      ] },
+      { type: 'p', text: 'By the end of the evening the wall is knee-high and a little taller than it was. It will rain on it tonight, and in the morning someone will walk up to see whether it held.' },
+    ],
+  },
+];
