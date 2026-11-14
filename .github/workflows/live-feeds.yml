@@ -1,12 +1,17 @@
 # The whole chain with real news: real RSS feeds -> ingestion -> clustering ->
 # evidence-linked stories -> daily edition -> JSON API -> newspaper in a browser.
 #
-# Started by hand, because it depends on the network and on what publishers serve
-# today. It activates the candidate sources only inside this run; nothing is
+# Not part of the regular CI, because it depends on the network and on what
+# publishers serve today. It activates the candidate sources only inside this run; nothing is
 # committed and nothing is published anywhere.
 name: Live feeds
 
 on:
+  # Also runs when the catalog or this file changes, so a new feed address is checked at once.
+  push:
+    paths:
+      - catalog/sources.json
+      - .github/workflows/live-feeds.yml
   workflow_dispatch:
     inputs:
       sources:
@@ -31,7 +36,7 @@ jobs:
           python-version: "3.12"
 
       - name: Activate sources for this run only
-        run: python3 scripts/activate-sources.py ${{ inputs.sources }}
+        run: python3 scripts/activate-sources.py ${{ inputs.sources || '--all' }}
 
       - name: Which feeds answer and parse
         run: |
