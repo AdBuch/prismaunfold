@@ -104,13 +104,13 @@ run_once() {
     seconds=$(( $(date +%s) - now + $(status_number "$status" seconds) ))
 
     if [ "$code" -eq 0 ]; then
-      write_status "$status" done "$attempts" "$seconds" 0 0
+      write_status "$status" "done" "$attempts" "$seconds" 0 0
     elif [ "$attempts" -ge "$MAX_ATTEMPTS" ]; then
-      write_status "$status" failed "$attempts" "$seconds" "$code" 0
+      write_status "$status" "failed" "$attempts" "$seconds" "$code" 0
       echo "worker[$AGENT]: '$topic' failed $attempts times; given up for edition $edition" >&2
     else
       wait_seconds=$((RETRY_BASE_SECONDS * (1 << (attempts - 1))))
-      write_status "$status" retrying "$attempts" "$seconds" "$code" $(( $(date +%s) + wait_seconds ))
+      write_status "$status" "retrying" "$attempts" "$seconds" "$code" $(( $(date +%s) + wait_seconds ))
       echo "worker[$AGENT]: '$topic' failed (attempt $attempts of $MAX_ATTEMPTS); next try in ${wait_seconds}s" >&2
     fi
   done 3< "$JOBS"

@@ -39,7 +39,7 @@ test('every reference resolves', () => {
     if (s.topicSlug) assert.ok(topicSlugs.has(s.topicSlug));
   }
   for (const e of editions) {
-    assert.ok(magSlugs.has(e.magazineSlug));
+    assert.ok(e.magazineSlug && magSlugs.has(e.magazineSlug));
     for (const p of e.placements) assert.ok(slugs.has(p.storySlug));
     for (const b of e.briefs) if (b.storySlug) assert.ok(slugs.has(b.storySlug));
   }
