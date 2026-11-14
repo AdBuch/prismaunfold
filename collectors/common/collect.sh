@@ -27,6 +27,7 @@ OUT_DIR="/out/${EDITION}/${AGENT}"
 REPORT="${OUT_DIR}/${TOPIC_ID}.json"
 LOG="${OUT_DIR}/${TOPIC_ID}.log"
 PROMPT_FILE="/tmp/prompt.md"
+(umask 000 && mkdir -p "/out/${EDITION}" && chmod 1777 "/out/${EDITION}" 2>/dev/null) || true
 mkdir -p "$OUT_DIR"
 cd /work
 
@@ -51,12 +52,19 @@ echo "collector: agent=$AGENT topic=$TOPIC language=$LANGUAGE edition=$EDITION" 
 # shellcheck disable=SC2086
 case "$AGENT" in
   codex)
-    : "${OPENAI_API_KEY:?OPENAI_API_KEY is required}"
-    codex login --api-key "$OPENAI_API_KEY" >/dev/null
+    if [ -n "${OPENAI_API_KEY:-}" ]; then
+      codex login --api-key "$OPENAI_API_KEY" >/dev/null
+    elif [ ! -s "${CODEX_HOME:-$HOME/.codex}/auth.json" ]; then
+      echo "collector: codex needs OPENAI_API_KEY or a mounted auth.json" >&2
+      exit 2
+    fi
     codex exec --skip-git-repo-check $AGENT_ARGS ${CODEX_ARGS:-} - < "$PROMPT_FILE" > "$LOG" 2>&1
     ;;
   claude)
-    : "${ANTHROPIC_API_KEY:?ANTHROPIC_API_KEY is required}"
+    if [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+      echo "collector: claude needs ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN" >&2
+      exit 2
+    fi
     claude -p "$(cat "$PROMPT_FILE")" \
       --allowedTools "WebSearch,WebFetch,Read,Write" \
       --max-turns "$MAX_TURNS" $AGENT_ARGS ${CLAUDE_ARGS:-} > "$LOG" 2>&1

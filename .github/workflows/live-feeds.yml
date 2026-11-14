@@ -1,0 +1,100 @@
+# The whole chain with real news: real RSS feeds -> ingestion -> clustering ->
+# evidence-linked stories -> daily edition -> JSON API -> newspaper in a browser.
+#
+# Started by hand, because it depends on the network and on what publishers serve
+# today. It activates the candidate sources only inside this run; nothing is
+# committed and nothing is published anywhere.
+name: Live feeds
+
+on:
+  workflow_dispatch:
+    inputs:
+      sources:
+        description: "Source ids to activate (space separated), or --all"
+        default: "--all"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Activate sources for this run only
+        run: python3 scripts/activate-sources.py ${{ inputs.sources }}
+
+      - name: Which feeds answer and parse
+        run: |
+          PYTHONPATH=src python3 - <<'PY'
+          from prismunfold.ingest import fetch_feed, parse_feed
+          from prismunfold.pipeline import load_catalog
+          ok = 0
+          for src in load_catalog("catalog/sources.json"):
+              if src.status != "active":
+                  continue
+              try:
+                  items = parse_feed(fetch_feed(src), src)
+                  ok += bool(items)
+                  print(f"{'OK  ' if items else 'EMPTY'} {src.id}: {len(items)} items")
+              except Exception as exc:
+                  print(f"FAIL {src.id}: {type(exc).__name__}: {exc}")
+          raise SystemExit(0 if ok else "no feed delivered any item")
+          PY
+
+      - name: Run the stack on live feeds
+        run: |
+          cp .env.example .env
+          rm -f config/topics.txt
+          docker compose build pipeline web
+          PIPELINE_INTERVAL=30 CHECK_LINKS=0 docker compose up -d volumes-init db pipeline web
+
+      - name: Wait for the first edition
+        run: |
+          for i in $(seq 1 60); do
+            count="$(curl -fsS http://localhost:8080/api/v1/index.json | jq '.storyCount // 0' || echo 0)"
+            if [ "${count:-0}" -ge 1 ]; then break; fi
+            sleep 5
+          done
+          curl -fsS http://localhost:8080/api/v1/index.json | jq .
+          test "$(curl -fsS http://localhost:8080/api/v1/index.json | jq '.storyCount')" -ge 1
+
+      - name: Every published sentence names a real publisher's page
+        run: |
+          curl -fsS http://localhost:8080/api/v1/editions.json > editions.json
+          jq -r '.[0] | "edition \(.date): \(.placements | length) stories, \(.briefs | length) briefs"' editions.json
+          jq -r '.[0].placements[] | "\(.slot)\t\(.language)\t\(.verificationState)\t\(.snapshot.headline)"' editions.json | head -20
+          for slug in $(jq -r '.[0].placements[].storySlug' editions.json); do
+            curl -fsS "http://localhost:8080/api/v1/stories/$slug.json" > story.json
+            jq -e '(.sentences | length) >= 1 and all(.sentences[]; (.sourceIds | length) >= 1)' story.json >/dev/null
+            jq -e 'all(.sources[]; (.url | test("^https?://")) and (.name | length) > 0)' story.json >/dev/null
+            jq -e '.agent == "desk" and .demo == false' story.json >/dev/null
+          done
+          echo "all placed stories carry sources"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: A browser reads the paper
+        working-directory: frontend
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          BASE_URL=http://localhost:8080 npm run test:e2e:api
+
+      - name: Logs
+        if: always()
+        run: docker compose logs --no-color --tail 150 pipeline web
+
+      - name: Stop
+        if: always()
+        run: docker compose down -v

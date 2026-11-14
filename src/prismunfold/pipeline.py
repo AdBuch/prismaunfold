@@ -34,6 +34,9 @@ DEFAULTS: dict = {
     "catalog_path": "catalog/sources.json",
     "db_path": "data/prismunfold.sqlite3",
     "site_dir": "site",
+    # Which collector agents may be assigned topics, how many write about each topic,
+    # and how many topics one agent may get per edition. See plan.py.
+    "agents": {"enabled": ["codex", "claude", "vibe", "goose"], "per_topic": 2, "max_topics_per_agent": 6},
 }
 
 FetchFn = Callable[[Source], bytes]

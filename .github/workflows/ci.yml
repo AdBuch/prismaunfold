@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   test:
-    name: Tests (Python ${{ matrix.python }})
+    name: Pipeline tests (Python ${{ matrix.python }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
@@ -49,11 +49,42 @@ jobs:
         env:
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
         run: |
-          set -o pipefail  # a failing test must fail the step, not be hidden by tee
           PYTHONPATH=src python -m unittest discover -s tests -v 2>&1 | tee test.log
           # The PostgreSQL tests must really have run, not been skipped.
           ! grep -q "TEST_DATABASE_URL is not set" test.log
           grep -q "PostgresStoreTest" test.log
+
+  frontend:
+    name: Frontend (types, unit tests, browser tests on the demo build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Type check
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: The production bundle contains no fixture content
+        run: |
+          npm run build
+          ! grep -q "example.org/demo" dist/main.js
+          ! grep -q "Valmera" dist/main.js
+      - name: Browser tests on the demo build
+        run: |
+          npx playwright install --with-deps chromium
+          npm run build:demo
+          grep -q "example.org/demo" dist/main.js
+          PORT=4200 node scripts/serve.mjs &
+          for i in $(seq 1 20); do curl -fsS http://localhost:4200/ >/dev/null && break; sleep 1; done
+          PORT=4200 npm run test:e2e
 
   scripts:
     name: Shell scripts and compose files
@@ -73,9 +104,16 @@ jobs:
           cp collectors/.env.example collectors/.env
           docker compose config --quiet
           TOPIC=ci docker compose -f collectors/docker-compose.yml config --quiet
+      - name: No source is active without a review
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          active = [s["id"] for s in json.load(open("catalog/sources.json")) if s["status"] == "active"]
+          sys.exit(f"active sources committed: {active}; see catalog/README.md" if active else 0)
+          PY
 
-  images:
-    name: Build images and run the stack
+  stack:
+    name: Build images, run the stack, read the paper in a browser
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -93,10 +131,26 @@ jobs:
           docker run --rm --entrypoint vibe   prismunfold/collector-vibe   --version
           docker run --rm --entrypoint goose  prismunfold/collector-goose  --version
 
-      - name: Start pipeline and web
+      - name: Containers run as unprivileged users
         run: |
-          printf 'en|CI smoke topic\nen|CI FAIL topic\n' > config/topics.txt
-          PIPELINE_INTERVAL=5 CHECK_LINKS=0 docker compose up -d volumes-init pipeline web
+          for image in pipeline web collector-codex collector-claude collector-vibe collector-goose; do
+            uid="$(docker run --rm --entrypoint id "prismunfold/$image" -u)"
+            echo "$image runs as uid $uid"
+            test "$uid" != "0"
+          done
+
+      - name: Start database, pipeline and web
+        run: |
+          printf 'en|CI smoke topic|claude\nen|CI FAIL topic|claude\nen|Not for claude|codex\n' > config/topics.txt
+          PIPELINE_INTERVAL=5 CHECK_LINKS=0 FEEDS=0 docker compose up -d volumes-init db pipeline web
+
+      - name: Before anything is published the paper shows an empty state
+        run: |
+          for i in $(seq 1 30); do curl -fsS http://localhost:8080/healthz >/dev/null && break; sleep 2; done
+          curl -fsS http://localhost:8080/ | grep -q '<div id="app">'
+          curl -fsS -o /dev/null -w '%{http_code}\n' http://localhost:8080/story/anything | grep -q 200
+          curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/missing.js | grep -q 404
+          curl -fsSI http://localhost:8080/ | grep -qi "content-security-policy"
 
       - name: Pipeline publishes the job list
         run: |
@@ -108,7 +162,6 @@ jobs:
 
       - name: A collector without credentials stays idle
         run: |
-          set -o pipefail
           docker compose run --rm -T -e WORKER_INTERVAL= claude 2>&1 | tee idle.log
           grep -q "stays idle" idle.log
 
@@ -119,31 +172,45 @@ jobs:
             -e PATH=/fake:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
             -e ANTHROPIC_API_KEY=not-a-real-key \
             -e WORKER_INTERVAL= \
-            claude
+            claude 2>&1 | tee worker.log
+          grep -q "failed (attempt 1 of 3)" worker.log   # the failing topic is retried later, not looped
+          ! grep -q "Not for claude" worker.log           # a topic assigned to another agent is left alone
 
-      - name: Web serves the checked story
+      - name: JSON API carries the checked story
         run: |
           for i in $(seq 1 30); do
-            count="$(curl -fsS http://localhost:8080/api/v1/index.json | jq '.editions[0].storyCount // 0' || echo 0)"
+            count="$(curl -fsS http://localhost:8080/api/v1/index.json | jq '.storyCount // 0' || echo 0)"
             if [ "$count" = "1" ]; then break; fi
             sleep 2
           done
           curl -fsS http://localhost:8080/api/v1/index.json | tee index.json
-          test "$(jq '.editions[0].storyCount' index.json)" = "1"
-          edition="$(jq -r '.editions[0].path' index.json)"
-          slug="$(curl -fsS "http://localhost:8080/api/v1/$edition" | jq -r '.topics[0].stories[0].slug')"
+          test "$(jq '.storyCount' index.json)" = "1"
+          curl -fsS http://localhost:8080/api/v1/editions.json > editions.json
+          slug="$(jq -r '.[0].placements[0].storySlug' editions.json)"
           curl -fsS "http://localhost:8080/api/v1/stories/$slug.json" | tee story.json
-          # The unsourced sentence was dropped; the failing topic produced no story.
+          # The unsourced sentence was dropped, so one sentence is left and the story needs review.
           test "$(jq '.sentences | length' story.json)" = "1"
           test "$(jq -r '.byline' story.json)" = "Claude Code"
-          curl -fsS http://localhost:8080/healthz
+          test "$(jq -r '.verification.state' story.json)" = "review_required"
+          test "$(jq -r '.sentences[0].verification.support' story.json)" = "not_checked"
 
-      - name: The story is stored in PostgreSQL
+      - name: The story is stored in PostgreSQL and the job status is reported
         run: |
-          set -o pipefail
           docker compose exec -T db psql -U prismunfold -d prismunfold -At \
             -c "SELECT agent, language, data->>'headline' FROM stories" | tee stories.txt
           test "$(wc -l < stories.txt)" = "1"
+          docker compose run --rm -T pipeline status --reports-dir /out | tee status.log
+          grep -q "claude: done=1 retrying=1 failed=0" status.log
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: A browser reads the paper
+        working-directory: frontend
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          BASE_URL=http://localhost:8080 EXPECT_HEADLINE="Smoke test report" npm run test:e2e:api
 
       - name: Logs
         if: always()

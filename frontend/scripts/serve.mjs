@@ -5,20 +5,24 @@ import { fileURLToPath } from 'node:url';
 import { run } from './build.mjs';
 
 const dist = fileURLToPath(new URL('../dist/', import.meta.url));
+// Local development without Docker: /api/ is served from the pipeline's output directory.
+const site = process.env.PRISM_SITE_DIR ?? fileURLToPath(new URL('../../site/', import.meta.url));
 const port = Number(process.env.PORT ?? 4200);
-const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.map': 'application/json', '.svg': 'image/svg+xml' };
+const types = { '.json': 'application/json; charset=utf-8', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.map': 'application/json', '.svg': 'image/svg+xml' };
 
 if (process.argv.includes('--watch')) await run({ watch: true });
 
 createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', 'http://localhost');
-  let file = normalize(join(dist, decodeURIComponent(url.pathname)));
-  if (!file.startsWith(dist)) { res.writeHead(403).end('Forbidden'); return; }
+  const api = url.pathname.startsWith('/api/');
+  const root = api ? site : dist;
+  let file = normalize(join(root, decodeURIComponent(url.pathname)));
+  if (!file.startsWith(root)) { res.writeHead(403).end('Forbidden'); return; }
   try {
     if (!(await stat(file)).isFile()) throw new Error('not a file');
   } catch {
     // Client-side routes fall back to index.html; missing assets stay 404.
-    if (extname(url.pathname)) { res.writeHead(404).end('Not found'); return; }
+    if (api || extname(url.pathname)) { res.writeHead(404).end('Not found'); return; }
     file = join(dist, 'index.html');
   }
   const body = await readFile(file);

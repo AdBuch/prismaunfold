@@ -4,12 +4,14 @@
     prismunfold context  write the archive's prior coverage of a topic for the collector agents
     prismunfold plan     write the job list and prior coverage for the collector containers
     prismunfold reports  check the collector agents' reports, store, index and export them
+    prismunfold status   summarise how the collectors' jobs went
 """
 
 from __future__ import annotations
 
 import argparse
 import dataclasses
+import json
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -21,7 +23,7 @@ from .ingest import fetch_feed
 from .linkcheck import check_story
 from .verification import verify_story
 from .models import Source
-from .plan import load_topics, write_plan
+from .plan import job_status, load_topics, write_plan
 from .pipeline import load_catalog, load_config, run
 from .reports import load_reports
 from .storage import open_store
@@ -88,10 +90,27 @@ def _plan(args: argparse.Namespace, cfg: dict) -> int:
     edition = agent_edition(_parse_now(args.now))
     store = _open(args, cfg)
     try:
-        path = write_plan(store, jobs, edition, args.shared_dir)
+        path = write_plan(store, jobs, edition, args.shared_dir, cfg.get("agents"), args.reports_dir)
     finally:
         store.close()
     print(f"plan: edition={edition} topics={len(jobs)} -> {path}")
+    return 0
+
+
+def _status(args: argparse.Namespace, cfg: dict) -> int:
+    """Print how the collectors' jobs went: per agent done / retrying / failed, tries and time."""
+    now = _parse_now(args.now)
+    edition = agent_edition(now) if args.edition == "current" else args.edition
+    summary = job_status(args.reports_dir, edition)
+    if args.json:
+        print(json.dumps(summary, indent=1))
+        return 0
+    print(f"status: edition={edition} jobs={len(summary['jobs'])}")
+    for agent, c in sorted(summary["agents"].items()):
+        print(
+            f"  {agent}: done={c['done']} retrying={c['retrying']} failed={c['failed']} "
+            f"attempts={c['attempts']} seconds={c['seconds']}"
+        )
     return 0
 
 
@@ -166,6 +185,13 @@ def main(argv: list[str] | None = None) -> int:
     plan_cmd.add_argument("--topics", default="config/topics.txt")
     plan_cmd.add_argument("--shared-dir", default="collectors/shared")
     plan_cmd.add_argument("--now", help="ISO 8601 time to plan for (default: current time)")
+    plan_cmd.add_argument("--reports-dir", help="collectors' output; used to see which agents are alive")
+
+    status_cmd = sub.add_parser("status", parents=[common], help="summarise the collectors' job status")
+    status_cmd.add_argument("--reports-dir", default="collectors/out")
+    status_cmd.add_argument("--edition", default="current")
+    status_cmd.add_argument("--now", help="ISO 8601 time that defines the current edition")
+    status_cmd.add_argument("--json", action="store_true")
 
     rep_cmd = sub.add_parser("reports", parents=[common], help="check, store and export agent reports")
     rep_cmd.add_argument("--reports-dir", default="collectors/out")
@@ -180,7 +206,7 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     cfg = load_config(args.config)
-    return {"run": _run, "context": _context, "plan": _plan, "reports": _reports}[args.command](args, cfg)
+    return {"run": _run, "context": _context, "plan": _plan, "status": _status, "reports": _reports}[args.command](args, cfg)
 
 
 if __name__ == "__main__":

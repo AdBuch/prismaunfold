@@ -83,7 +83,7 @@ test('adjacent edition navigation', async () => {
   assert.deepEqual(await svc.getAdjacentEditions('2026-11-08'), { previous: '2026-11-07', next: '2026-11-09' });
   assert.deepEqual(await svc.getAdjacentEditions('2026-11-07'), { next: '2026-11-08' });
   assert.deepEqual(await svc.getAdjacentEditions('2026-11-09'), { previous: '2026-11-08' });
-  assert.equal((await svc.getLatestEdition()).date, '2026-11-09');
+  assert.equal((await svc.getLatestEdition())?.date, '2026-11-09');
   assert.deepEqual((await svc.listEditions()).map((e) => e.date), ['2026-11-09', '2026-11-08', '2026-11-07']);
 });
 

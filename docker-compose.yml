@@ -1,25 +1,32 @@
 # PrismUnfold: every component in its own container.
 #
-#   cp .env.example .env                              # add at least one agent's API key
+#   cp .env.example .env                              # add at least one agent's credentials
 #   cp config/topics.example.txt config/topics.txt    # choose the topics
 #   docker compose up --build -d
-#   open http://localhost:8080/api/v1/index.json
+#   open http://localhost:8080
 #
-# pipeline   plans each 6-hour edition, checks the agents' reports, keeps the archive, exports JSON
+# pipeline   plans each 6-hour edition, checks the agents' reports, reads the feeds,
+#            keeps the archive, composes the daily edition and exports JSON
 # codex, claude, vibe, goose
-#            one writer each; picks up the job list and writes one report per topic.
+#            one writer each; works through the topics assigned to it.
 #            An agent without credentials in .env logs that and stays idle.
-# db         PostgreSQL: stories, archive search index, feed articles
-# web        serves the exported JSON on port 8080
+# db         PostgreSQL: stories, archive search index, feed articles, frozen editions
+# web        the newspaper frontend plus the exported JSON, on port 8080
 #
 # Containers talk only through volumes:
 #   shared   pipeline -> collectors   job list and prior coverage     (collectors: read-only)
-#   reports  collectors -> pipeline   one JSON report per agent and topic
+#   reports  collectors -> pipeline   reports and job status           (pipeline: read-only)
 #   site     pipeline -> web          exported JSON                    (web: read-only)
 #   pgdata   db only                  PostgreSQL data
 # Only the pipeline talks to the database; it is not published on a host port.
 
+x-hardening: &hardening
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  pids_limit: 256
+
 x-collector: &collector
+  <<: *hardening
   env_file: .env
   environment:
     WORKER_INTERVAL: ${WORKER_INTERVAL:-300}
@@ -30,13 +37,15 @@ x-collector: &collector
   depends_on:
     volumes-init:
       condition: service_completed_successfully
+  mem_limit: 2g
+  cpus: 1.5
   restart: on-failure
 
 services:
   # Named volumes start out owned by root; the services run as unprivileged users.
   volumes-init:
     image: busybox:stable
-    command: ["sh", "-c", "chmod 1777 /out && chown 1000:1000 /site /shared"]
+    command: ["sh", "-c", "mkdir -p /out/_agents && chmod 1777 /out /out/_agents && chown 1000:1000 /site /shared"]
     volumes:
       - reports:/out
       - site:/site
@@ -56,9 +65,12 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 1g
     restart: unless-stopped
 
   pipeline:
+    <<: *hardening
     image: prismunfold/pipeline
     build: { context: ., dockerfile: docker/pipeline/Dockerfile }
     environment:
@@ -76,6 +88,10 @@ services:
         condition: service_completed_successfully
       db:
         condition: service_healthy
+    read_only: true
+    tmpfs: [/tmp]
+    mem_limit: 1g
+    cpus: 1.0
     restart: unless-stopped
 
   codex:
@@ -99,6 +115,7 @@ services:
     build: { context: collectors, dockerfile: goose/Dockerfile }
 
   web:
+    <<: *hardening
     image: prismunfold/web
     build: { context: ., dockerfile: docker/web/Dockerfile }
     ports:
@@ -108,6 +125,9 @@ services:
     depends_on:
       volumes-init:
         condition: service_completed_successfully
+    read_only: true
+    tmpfs: [/tmp]
+    mem_limit: 256m
     restart: unless-stopped
 
 volumes:

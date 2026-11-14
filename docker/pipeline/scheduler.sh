@@ -25,11 +25,14 @@ LINK_FLAG="--check-links"
 
 while :; do
   echo "pipeline: cycle start $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  cli plan --topics "${TOPICS_FILE:-/app/config/topics.txt}" --shared-dir /shared \
+  cli plan --topics "${TOPICS_FILE:-/app/config/topics.txt}" --shared-dir /shared --reports-dir /out \
     || echo "pipeline: plan failed" >&2
+  cli status --reports-dir /out || true
   # Exit code 1 means some report was rejected; the details are in the log above.
   cli reports --reports-dir /out --edition recent $LINK_FLAG \
     || echo "pipeline: at least one report was rejected" >&2
-  cli run || echo "pipeline: feed run failed" >&2
+  if [ "${FEEDS:-1}" = "1" ]; then
+    cli run || echo "pipeline: feed run failed" >&2
+  fi
   sleep "${PIPELINE_INTERVAL:-600}"
 done

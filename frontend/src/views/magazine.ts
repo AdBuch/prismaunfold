@@ -81,6 +81,7 @@ export async function magazinesView(svc: ContentService): Promise<ViewResult> {
     <p class="kicker">Magazine</p>
     <h1 class="page__title">Background</h1>
     <p class="page__dek">Slower, longer and more atmospheric. Where the daily edition tells you what happened, the magazine explains how we got here.</p>
+    ${features.length ? '' : html`<p class="state state--empty hint">No feature has been published yet. Deep dives appear here when a topic has enough reporting behind it.</p>`}
     <div class="mag-index">${features.map((f) => html`<article class="mag-index__item">
       <a href="${paths.magazine(f.slug)}" data-link tabindex="-1" aria-hidden="true">${figure(f.hero, { ratio: '4 / 3' })}</a>
       <p class="kicker">${f.kicker}</p>

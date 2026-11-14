@@ -5,8 +5,12 @@ import { fileURLToPath } from 'node:url';
 const root = new URL('../', import.meta.url);
 const p = (rel) => fileURLToPath(new URL(rel, root));
 
+// PRISM_CONTENT=demo bundles the fictional fixtures. The default build reads the
+// pipeline's JSON API and contains no fixture content at all.
+const demo = process.env.PRISM_CONTENT === 'demo';
+
 const options = {
-  entryPoints: [p('src/main.ts')],
+  entryPoints: [p(demo ? 'src/entry-demo.ts' : 'src/entry-api.ts')],
   bundle: true,
   format: 'esm',
   target: 'es2022',

@@ -6,6 +6,16 @@ import type { ViewResult } from './types.ts';
 
 export async function archiveView(svc: ContentService): Promise<ViewResult> {
   const editions = await svc.listEditions();
+  if (!editions.length) {
+    return {
+      title: 'Archive', nav: 'archive', mode: 'news',
+      body: html`<main id="main" tabindex="-1" class="page page--narrow state state--empty">
+        <p class="kicker">Archive</p>
+        <h1 class="page__title">No editions yet</h1>
+        <p class="page__dek">Past editions are listed here once the first one has been published.</p>
+      </main>`,
+    };
+  }
   const min = editions[editions.length - 1]?.date ?? '';
   const max = editions[0]?.date ?? '';
   const body = html`<main id="main" tabindex="-1" class="page">
@@ -25,7 +35,7 @@ export async function archiveView(svc: ContentService): Promise<ViewResult> {
         <a href="${paths.edition(e.date)}" data-link class="archive-item__link">
           <span class="archive-item__date">${formatLong(e.date)}<small>No. ${e.number}</small></span>
           <span class="archive-item__lead">${lead ? html`<span class="kicker">${sectionLabel(lead.section)}</span><strong>${lead.snapshot.headline}</strong>` : ''}
-          <span class="archive-item__count">${e.placements.length} stories · ${e.briefs.length} briefs · 1 feature</span></span>
+          <span class="archive-item__count">${e.placements.length} stories · ${e.briefs.length} briefs${e.magazineSlug ? ' · 1 feature' : ''}</span></span>
         </a>
       </li>`;
     })}</ol>

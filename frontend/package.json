@@ -2,15 +2,18 @@
   "name": "prismunfold-frontend",
   "version": "0.2.0",
   "private": true,
-  "description": "PrismUnfold Phase 2 frontend prototype (demo content only)",
+  "description": "PrismUnfold newspaper frontend. Reads the pipeline's JSON API; a demo build with fictional fixtures exists for tests",
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
+    "build:demo": "PRISM_CONTENT=demo node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
     "start": "node scripts/build.mjs && node scripts/serve.mjs",
+    "start:demo": "PRISM_CONTENT=demo node scripts/build.mjs && node scripts/serve.mjs",
     "dev": "node scripts/serve.mjs --watch",
     "test": "node --test --experimental-strip-types \"tests/*.test.ts\"",
-    "test:e2e": "node tests/e2e.mjs"
+    "test:e2e": "node tests/e2e.mjs",
+    "test:e2e:api": "node tests/e2e-api.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.25.0",

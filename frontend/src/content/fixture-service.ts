@@ -1,5 +1,5 @@
 import type { Edition, MagazineFeature, Section, Story, Topic } from '../models.ts';
-import type { AdjacentEditions, ContentService } from './content-service.ts';
+import type { AdjacentEditions, ContentService, SiteInfo } from './content-service.ts';
 import { editions } from './editions.ts';
 import { magazines } from './magazines.ts';
 import { stories } from './stories.ts';
@@ -17,19 +17,15 @@ export const SECTIONS: Section[] = [
 
 const wait = <T>(v: T): Promise<T> => Promise.resolve(v);
 
-/** Local-fixture implementation. Swap for an HTTP-backed one later. */
+/** Fictional demo content from local fixtures. Used by tests and the demo build only. */
 export class FixtureContentService implements ContentService {
   private readonly sortedEditions = [...editions].sort((a, b) => b.date.localeCompare(a.date));
 
-  listSections() { return wait(SECTIONS); }
+  getSiteInfo(): Promise<SiteInfo> { return wait({ sections: SECTIONS, languages: ['en'], regions: [] }); }
   listEditions() { return wait(this.sortedEditions); }
   getEdition(date: string) { return wait(this.sortedEditions.find((e) => e.date === date)); }
 
-  getLatestEdition(): Promise<Edition> {
-    const latest = this.sortedEditions[0];
-    if (!latest) throw new Error('No editions available');
-    return wait(latest);
-  }
+  getLatestEdition(): Promise<Edition | undefined> { return wait(this.sortedEditions[0]); }
 
   getAdjacentEditions(date: string): Promise<AdjacentEditions> {
     const asc = [...this.sortedEditions].reverse();
@@ -57,5 +53,3 @@ export class FixtureContentService implements ContentService {
     return wait(this.sortedEditions.filter((e) => e.placements.some((p) => p.storySlug === slug)));
   }
 }
-
-export const content: ContentService = new FixtureContentService();

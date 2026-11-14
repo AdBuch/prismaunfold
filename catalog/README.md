@@ -16,3 +16,20 @@ Each entry:
 | `regions`, `topics` | lists | Tags for the feed mix |
 
 New sources start as `pending_review`. A person sets them to `active` after checking rights and quality.
+
+## The candidates in `sources.json`
+
+The file ships with a few well-known feeds as **candidates**. All are `pending_review`,
+so a fresh checkout fetches nothing. They are set to `link_only`: only the headline and
+the link are kept and shown, with the publisher named.
+
+Before you set one to `active`:
+
+1. Read the publisher's terms for its feed. Most allow personal, non-commercial use of
+   headlines and links; a public news site is a different use and may need permission.
+2. Decide whether `link_only` is enough or the terms allow `excerpt_only`.
+3. Check the feed still exists: run the "Live feeds" workflow, or
+   `PYTHONPATH=src python3 -m prismunfold run` and read the errors it prints.
+
+Nobody has done this review yet. The feed addresses were written from memory and are
+only confirmed where the "Live feeds" workflow has run green for them.

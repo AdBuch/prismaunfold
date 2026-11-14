@@ -10,3 +10,5 @@ collectors/shared/
 node_modules/
 dist/
 *.log
+frontend/dist/
+frontend/node_modules/

@@ -1,5 +1,6 @@
 # One topic per line: <language>|<topic>
-# Copy to topics.txt and edit. Each agent writes one report per line.
+# Copy to topics.txt and edit. Two agents are chosen per topic, in rotation.
+# To name the writers yourself, add a third column: en|Swiss federal politics|claude,codex
 en|Swiss federal politics
 de|Energiepolitik in der Schweiz
 es|Política económica en Perú

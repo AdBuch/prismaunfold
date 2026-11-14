@@ -1,16 +1,14 @@
 /**
- * Typed domain models for the PrismUnfold Phase 2 prototype.
- * All fixture content is fictional demo material (see `demo: true`).
+ * Typed domain models for the PrismUnfold newspaper.
+ * The pipeline's JSON API (site/api/v1) is written in these shapes.
+ * Fixture content is fictional demo material and carries `demo: true`.
  */
 
-export type SectionId =
-  | 'switzerland'
-  | 'international'
-  | 'peru'
-  | 'society'
-  | 'science'
-  | 'discoveries'
-  | 'underreported';
+/**
+ * A section of the paper. The demo fixtures use a fixed set; the real pipeline
+ * derives sections from the topics it covers, so the id is an open string.
+ */
+export type SectionId = string;
 
 export interface Section {
   id: SectionId;
@@ -33,16 +31,49 @@ export interface ImageRef {
 
 export interface SourceReference {
   id: string;
-  /** Fictional publisher name used for demo purposes. */
+  /** Publisher name. Fictional in the demo fixtures. */
   name: string;
   title: string;
-  /** Uses reserved example.org domain: never a real publisher link. */
+  /** Link to the original report. The demo fixtures use the reserved example.org domain. */
   url: string;
-  publishedAt: string; // ISO date
+  /** ISO date or date-time; absent when the source gave none. */
+  publishedAt?: string;
   note?: string;
 }
 
 export type Confidence = 'established' | 'reported' | 'disputed';
+
+/**
+ * What is known about a claim. A source link alone never makes a claim `supported`:
+ * that needs a check that the source really says so.
+ */
+export type VerificationState = 'unverified' | 'supported' | 'disputed' | 'review_required';
+
+export interface ClaimVerification {
+  state: VerificationState;
+  citation: 'structural';
+  /** null: links were not opened. */
+  sources_reachable: boolean | null;
+  support: 'not_checked' | 'supported' | 'not_supported' | 'contradicted';
+  independent_publishers: number;
+  corroborated: boolean;
+}
+
+export interface StoryVerification {
+  state: VerificationState;
+  checker?: string;
+  links_checked?: boolean;
+  independent_publishers?: number;
+  corroborated_sentences?: number;
+  reasons: string[];
+}
+
+export interface StorySentence {
+  text: string;
+  /** Ids of the SourceReference entries backing this sentence. */
+  sourceIds: string[];
+  verification?: ClaimVerification | null;
+}
 
 export interface Correction {
   date: string;
@@ -67,7 +98,20 @@ export interface Story {
   topicSlug?: string;
   relatedSlugs: string[];
   image: ImageRef;
-  demo: true;
+  /** Pipeline content: the text sentence by sentence, each with its sources. */
+  sentences?: StorySentence[];
+  verification?: StoryVerification;
+  /** What is not known. */
+  uncertainties?: string[];
+  /** Points on which sources contradict each other. */
+  disputes?: string[];
+  language?: string;
+  regions?: string[];
+  /** Which writer produced it: an agent name, or "desk" for the feed desk. */
+  agent?: string;
+  model?: string;
+  /** True only for the fictional fixtures; real pipeline content is false. */
+  demo: boolean;
 }
 
 export type TimelineEventKind = 'milestone' | 'report' | 'update' | 'correction';
@@ -91,7 +135,8 @@ export interface Topic {
   section: SectionId;
   events: TimelineEvent[];
   image: ImageRef;
-  demo: true;
+  /** True only for the fictional fixtures; real pipeline content is false. */
+  demo: boolean;
 }
 
 export type MagazineBlock =
@@ -118,7 +163,8 @@ export interface MagazineFeature {
   relatedFeatureSlugs: string[];
   topicSlug?: string;
   sources: SourceReference[];
-  demo: true;
+  /** True only for the fictional fixtures; real pipeline content is false. */
+  demo: boolean;
 }
 
 /** Snapshot of how a story looked at publication, so old editions stay stable. */
@@ -136,6 +182,13 @@ export interface EditionStoryPlacement {
   slot: PlacementSlot;
   order: number;
   snapshot: PlacementSnapshot;
+  language?: string;
+  regions?: string[];
+  verificationState?: VerificationState;
+  /** A lone, thinly sourced voice from its region or section, placed on purpose. */
+  underreported?: boolean;
+  /** The story first ran in an earlier edition and gained sources since. */
+  isUpdate?: boolean;
 }
 
 export interface Brief {
@@ -143,6 +196,8 @@ export interface Brief {
   section: SectionId;
   text: string;
   storySlug?: string;
+  language?: string;
+  regions?: string[];
 }
 
 export interface Edition {
@@ -152,7 +207,9 @@ export interface Edition {
   editorsNote: string;
   placements: EditionStoryPlacement[];
   briefs: Brief[];
-  magazineSlug: string;
+  /** Absent when the edition carries no feature. */
+  magazineSlug?: string;
   magazineTeaser: string;
-  demo: true;
+  /** True only for the fictional fixtures; real pipeline content is false. */
+  demo: boolean;
 }

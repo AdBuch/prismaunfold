@@ -5,6 +5,7 @@ export type Route =
   | { name: 'topic'; slug: string }
   | { name: 'magazine'; slug: string }
   | { name: 'magazines' }
+  | { name: 'preferences' }
   | { name: 'about' }
   | { name: 'notfound'; path: string };
 
@@ -20,6 +21,7 @@ export function matchRoute(pathname: string): Route {
   if (a === 'topic' && seg.length === 2 && b) return { name: 'topic', slug: b };
   if (a === 'magazine' && seg.length === 1) return { name: 'magazines' };
   if (a === 'magazine' && seg.length === 2 && b) return { name: 'magazine', slug: b };
+  if (a === 'preferences' && seg.length === 1) return { name: 'preferences' };
   if (a === 'about' && seg.length === 1) return { name: 'about' };
   return { name: 'notfound', path };
 }
@@ -31,5 +33,6 @@ export const paths = {
   topic: (slug: string) => `/topic/${slug}`,
   magazine: (slug: string) => `/magazine/${slug}`,
   magazines: () => '/magazine',
+  preferences: () => '/preferences',
   about: () => '/about',
 };
