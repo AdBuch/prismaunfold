@@ -86,24 +86,6 @@
     ]
   },
   {
-    "id": "elpais",
-    "name": "El País",
-    "feed_url": "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada",
-    "languages": [
-      "es"
-    ],
-    "rights": "link_only",
-    "status": "pending_review",
-    "ai_policy": "exclude",
-    "regions": [
-      "es",
-      "latam"
-    ],
-    "topics": [
-      "internacional"
-    ]
-  },
-  {
     "id": "elcomercio-pe",
     "name": "El Comercio (Perú)",
     "feed_url": "https://elcomercio.pe/arcio/rss/",

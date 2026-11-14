@@ -114,6 +114,13 @@ Keep **News Intelligence**, **Media Marketplace** and **Editorial / Originals** 
 **North star:** *Help people understand the world, not tell them what to think, while making independent journalism economically sustainable.*
 
 
+## Status of this document
+
+The sections below describe the original Phase 2 prototype, which ran on fictional
+fixtures only. Since the integration the default build reads real stories from the
+pipeline's JSON API; the fixtures remain as the demo build (`npm run start:demo`) and
+for tests. Current instructions are in the README at the repository root.
+
 ## Phase 2 frontend prototype
 
 A runnable newspaper prototype lives in `src/`. **All content is fictional demo material**: no real events, publishers or sources, and nothing is verified. Source links use reserved `example.org` addresses.

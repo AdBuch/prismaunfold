@@ -99,99 +99,103 @@ Keep **News Intelligence**, **Media Marketplace** and **Editorial / Originals** 
 
 ---
 
-## Run everything with Docker
+## Run the newspaper
 
-Every component runs in its own container.
+Everything runs in containers. You need Docker with Compose.
 
 ```bash
-cp .env.example .env                              # add at least one agent's API key
-cp config/topics.example.txt config/topics.txt    # one line per topic: <language>|<topic>
+cp .env.example .env                              # credentials for the agents (optional, see below)
+cp config/topics.example.txt config/topics.txt    # topics for the agents (optional)
+python3 scripts/activate-sources.py srf-news bbc-world guardian-world   # feeds to read; see catalog/README.md
 docker compose up --build -d
-curl http://localhost:8080/api/v1/index.json
 ```
+
+Open <http://localhost:8080>. The first edition appears after the pipeline's first
+cycle, usually within a minute; until then the paper says that nothing has been
+published yet.
+
+You get real news from the feeds alone. The agents are optional: an agent without
+credentials in `.env` stays idle.
 
 | Container | Job |
 | --- | --- |
-| `pipeline` | Every 10 minutes: plans the current 6-hour edition, checks the agents' reports, keeps the archive, exports JSON |
-| `codex`, `claude`, `vibe`, `goose` | One writer each. Reads the job list, writes one report per topic. Idle without credentials |
-| `db` | PostgreSQL: stories, archive search index, feed articles. Reachable only by the pipeline |
-| `web` | Serves the exported JSON on port 8080 |
+| `pipeline` | Every 10 minutes: reads the feeds, plans the agents' topics, checks their reports, keeps the archive, composes the daily edition, exports JSON |
+| `codex`, `claude`, `vibe`, `goose` | One writer each. Works through the topics assigned to it |
+| `db` | PostgreSQL. Reachable only by the pipeline |
+| `web` | The newspaper frontend and the exported JSON, on port 8080 |
 | `volumes-init` | Sets volume permissions once, then exits |
 
-The containers talk only through volumes: the pipeline writes the job list and our
-prior coverage of each topic, the collectors write reports, the pipeline checks them
-and exports JSON, the web container serves it. No container starts another one and
-none needs the Docker socket.
+The containers talk only through volumes. No container starts another one and none
+needs the Docker socket. They run as unprivileged users with dropped capabilities
+and resource limits; pipeline and web have a read-only file system.
 
 Useful commands:
 
 ```bash
-docker compose logs -f pipeline claude        # what is happening
+docker compose logs -f pipeline                      # what is happening
+docker compose run --rm pipeline status --reports-dir /out   # how the agents' jobs went
 docker compose run --rm pipeline reports --reports-dir /out --force   # re-check all reports
-docker compose down                           # stop; add -v to delete all data
+python3 scripts/activate-sources.py --reset          # stop reading all feeds
+docker compose down                                  # stop; add -v to delete all data
 ```
 
-Status: CI builds all images and runs the stack with a stand-in agent
-(`.github/workflows/ci.yml`). A run with real agents and API keys has not happened
-yet; see `collectors/README.md` for the open points. The frontend is not part of
-this setup yet.
+Before the first start, set `POSTGRES_PASSWORD` in `.env`.
 
-Set `POSTGRES_PASSWORD` in `.env` before the first start; the default is only acceptable
-on a machine nobody else can reach. Without Docker, the pipeline falls back to a SQLite file.
+### Sources are your decision
 
-## MVP (Phase 1) quickstart
+`catalog/sources.json` ships with six candidate feeds, all `pending_review`, so a fresh
+checkout reads nothing. Activating one is an editorial and legal decision: read
+`catalog/README.md` first. The candidates keep only the headline and the link.
 
-The pipeline uses only the Python standard library (3.11+). It has two inputs: RSS/Atom feeds, and reports written by collector agents (see `collectors/`). Its only output is JSON for the frontend.
+### The agents
+
+- Two agents are chosen per topic, in rotation, within a budget per agent. Change this
+  under `agents` in `config/config.json`, or name the writers per topic in `topics.txt`.
+- A failed job is retried twice with growing pauses, then given up for that edition.
+- Credentials: an API key, or for Claude Code and Codex a subscription login (see
+  `.env.example`). Check your provider's terms before running a subscription unattended.
+- **No real agent has run yet.** The collector images are tested with a stand-in. Start
+  with one agent and one topic, and set a spending limit with your provider.
+
+### What the labels on a story mean
+
+| Label | Meaning |
+| --- | --- |
+| Backed by its sources (`supported`) | A check confirmed the cited source says this. Today only feed-desk stories reach it, because their sentences are taken from the cited article |
+| Cited, not yet checked (`unverified`) | Every sentence names a source; nobody checked that the source says so |
+| Thinly sourced (`review_required`) | A single publisher, an unreachable source, or sentences removed for lack of a source |
+| Sources disagree (`disputed`) | Sources contradict each other; the story says where |
+
+No story is ever called verified. See `src/prismunfold/verification.py`.
+
+### Develop without Docker
 
 ```bash
-# Tests
-PYTHONPATH=src python3 -m unittest discover -s tests -v
+# Pipeline (Python 3.11+, standard library only; SQLite file as the store)
+PYTHONPATH=src python3 -m unittest discover -s tests
+PYTHONPATH=src python3 -m prismunfold run            # reads active feeds, writes site/api/v1
 
-# Check, store, index and export the collector agents' reports
-PYTHONPATH=src python3 -m prismunfold reports --reports-dir collectors/out
-
-# Write our earlier coverage of a topic, for the agents to build on
-PYTHONPATH=src python3 -m prismunfold context --topic "Swiss energy policy" --out collectors/context/prior.md
-
-# Build an edition offline from the demo fixtures
-PYTHONPATH=src python3 -m prismunfold run \
-  --catalog tests/fixtures/catalog.json --fixtures tests/fixtures \
-  --now 2026-11-06T06:30:00+01:00
-
-# Build from live sources (only entries with status "active" in catalog/sources.json are fetched)
-PYTHONPATH=src python3 -m prismunfold run
+# Frontend (Node 22)
+cd frontend && npm install
+npm start          # real content: serves ../site/api/v1 next to the app on :4200
+npm run start:demo # fictional fixtures, clearly labelled
+npm run typecheck && npm test
 ```
 
-Output lands in `site/api/v1/` as static JSON; the pipeline renders no HTML. Without `DATABASE_URL` the store is the SQLite file `data/prismunfold.sqlite3`; with `DATABASE_URL=postgresql://...` (and `pip install "psycopg[binary]"`) it is PostgreSQL. `data/` and `site/` are git-ignored.
+### What is tested
 
-| File | Content |
-| --- | --- |
-| `index.json` | Editions with agent-written stories, newest first |
-| `editions/<edition>.json` | Stories of one edition, grouped by topic; several writers per topic |
-| `stories/<slug>.json` | One story: sentences with source ids, sources, byline, AI disclosure |
-| `briefings/<lang>/latest.json` | Feed-based events of the current edition window |
+Every push runs, in GitHub Actions: the pipeline tests on SQLite and PostgreSQL
+(including hostile agent reports), frontend type check and unit tests, browser tests
+on the demo build, ShellCheck, and a full stack run in which a browser reads a story
+that went through the collector container, the report check and the database.
 
-### Agent reports and the archive
+The "Live feeds" workflow runs the whole chain on real feeds. It runs when the catalog
+changes or on demand, never as a gate, because it depends on the network.
 
-- A report is untrusted input. A sentence without a well-formed http(s) source URL is dropped; a report with no sourced sentence, an unknown agent or a mismatching edition is rejected, and `reports` exits with code 1.
-- With `--check-links`, every cited URL is opened; sources that do not answer are removed and sentences left without a source are dropped. Only public hosts are contacted. This catches invented links, not a real page that fails to support the sentence.
-- Every accepted story is added to a search index (keyword ranking; a tsvector column in PostgreSQL, FTS5 in SQLite). `context` retrieves earlier stories on a topic and the collectors append them to the agent prompt. Embeddings can replace the keyword search later.
-- A story is never labelled as verified: confidence is `reported`, or `disputed` when uncertainties are listed.
+### Where things are
 
-### What the MVP does
-
-- Reads RSS 2.0 and Atom feeds, respects robots.txt, refuses DTDs and entities.
-- Drops articles that are stale, future-dated, AI-disclosed (if the source excludes AI), or syndicated copies. Each drop is logged with its reason.
-- Enforces source rights: `excerpt_only` drops the body, `link_only` drops the excerpt too.
-- Groups articles about the same event (title similarity within 36 hours, same language).
-- Writes an extractive summary. Each sentence cites its articles. Uncited sentences are removed.
-- Selects up to 25 events per edition, at most 5 per primary topic.
-- Builds editions at 00/06/12/18 local time for the configured time zone (IANA rules, DST-safe).
-
-### Not in the MVP yet
-
-- LLM summaries and translations (`NoTranslator` marks them as pending in the JSON).
-- Personal ranking and feed keys (designed for the device, see the decision log).
-- Topic requests, a review queue for new sources, and a running scheduler.
-- Images are linked from the source, not stored locally.
-- Clustering works within one language only.
+- `docs/audit.md`: what was found, what is fixed, the backlog and the open risks
+- `docs/architecture.md`: how the parts fit together
+- `collectors/README.md`: the agent images
+- `catalog/README.md`: the source catalog and how to review a source
+- `frontend/README.md`: the frontend prototype's original notes

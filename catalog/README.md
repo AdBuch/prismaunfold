@@ -31,5 +31,8 @@ Before you set one to `active`:
 3. Check the feed still exists: run the "Live feeds" workflow, or
    `PYTHONPATH=src python3 -m prismunfold run` and read the errors it prints.
 
-Nobody has done this review yet. The feed addresses were written from memory and are
-only confirmed where the "Live feeds" workflow has run green for them.
+Nobody has done this rights review yet.
+
+What is confirmed: on 14 November 2026 the "Live feeds" workflow fetched and parsed
+all six candidates. A seventh, El País, was removed because its `robots.txt`
+disallows the feed address, and the pipeline does not fetch what robots.txt disallows.
