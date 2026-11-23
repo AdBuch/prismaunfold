@@ -3,7 +3,8 @@ import type { ViewResult } from './types.ts';
 
 type Source = { id: string; url: string; title: string; publisher: string };
 type Article = { section: string; headline: string; lead: string; paragraphs: { heading?: string; text: string; source_ids: string[] }[]; sources: Source[] };
-type Edition = { date: string; articles: Article[]; magazine: Article; disclosure: string; warnings: string[] };
+type ShortItem = { text: string; sources: Source[] };
+type Edition = { random?: ShortItem; lagebild?: (ShortItem & { category: string })[]; date: string; articles: Article[]; magazine: Article; disclosure: string; warnings: string[] };
 
 function article(a: Article, index: number) {
   const ids = new Map(a.sources.map((s, i) => [s.id, i + 1]));
@@ -12,6 +13,10 @@ function article(a: Article, index: number) {
     ${a.paragraphs.map(p => html`${p.heading ? html`<h3>${p.heading}</h3>` : ''}<p>${p.text} <sup>${p.source_ids.map(id => ids.get(id)).filter(Boolean).join(', ')}</sup></p>`)}
     <details class="editorial-sources"><summary>Quellen · ${a.sources.length}</summary><ol>${a.sources.map(s => html`<li><a href="${/^https?:\/\//i.test(s.url) ? s.url : '#'}" target="_blank" rel="noopener noreferrer">${s.publisher}: ${s.title}</a></li>`)}</ol></details>
   </article>`;
+}
+
+function shortItem(item: ShortItem) {
+  return html`<p>${item.text}</p><details class="editorial-sources"><summary>Quellen</summary><ul>${item.sources.map(s => html`<li><a href="${/^https?:\/\//i.test(s.url) ? s.url : '#'}" target="_blank" rel="noopener noreferrer">${s.publisher}: ${s.title}</a></li>`)}</ul></details>`;
 }
 
 export async function editorialView(date?: string): Promise<ViewResult> {
@@ -29,6 +34,8 @@ export async function editorialView(date?: string): Promise<ViewResult> {
       <nav class="editorial-contents" aria-label="Inhalt">${e.articles.map((a,i) => html`<a href="#article-${i}">${a.section}: ${a.headline}</a>`)}<a href="#magazin">Magazin: ${e.magazine.headline}</a></nav>
       <div class="editorial-news">${e.articles.map((a,i) => article(a,i))}</div>
       <section id="magazin" class="editorial-magazine"><div class="editorial-magazine-label">MAGAZIN / VERTIEFUNG</div>${article(e.magazine,e.articles.length)}</section>
+      ${e.random ? html`<section class="editorial-article"><div class="editorial-kicker">Random des Tages</div>${shortItem(e.random)}</section>` : ''}
+      ${e.lagebild?.length ? html`<section class="editorial-article"><h2>Lagebild</h2><p class="editorial-disclosure">Redaktionelle Einschätzung · KI-Analyse</p><div class="editorial-news">${e.lagebild.map(item => html`<div><h3>${item.category}</h3>${shortItem(item)}</div>`)}</div></section>` : ''}
       ${e.warnings.length ? html`<details><summary>Redaktionelle Hinweise</summary>${e.warnings.map(w => html`<p>${w}</p>`)}</details>` : ''}` : html`<p>Für diese Ausgabe liegt noch keine veröffentlichte Redaktion vor.</p>`}
     </main>`};
 }
