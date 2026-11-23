@@ -102,7 +102,7 @@ def validate(raw, probe=http_probe):
 
 def editions(store):
     # Existing editions table; independent namespace, no changes to feed editions.
-    rows = store.db.execute("SELECT data FROM editions WHERE id LIKE 'editorial|morgenbriefing|%' ORDER BY id DESC").fetchall() if store.db.__class__.__module__.startswith("sqlite3") else store.db.execute("SELECT data FROM editions WHERE id LIKE 'editorial|morgenbriefing|%' ORDER BY id DESC").fetchall()
+    rows = store.db.execute("SELECT data FROM editions WHERE id LIKE 'editorial|morgenbriefing|%' ORDER BY id DESC").fetchall()
     return [json.loads(row[0]) if isinstance(row[0], str) else row[0] for row in rows]
 
 
