@@ -218,4 +218,8 @@ def export_site(store, site_dir: str | Path, now: datetime | None = None) -> lis
             },
         )
     )
+    # Editorial editions are stored separately from the feed-based newspaper.
+    from .editorial import export_editorial
+    if hasattr(store, 'db'):
+        written.append(export_editorial(store, site_dir))
     return written

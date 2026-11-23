@@ -390,3 +390,26 @@ a:hover .figure__frame .art { transform: scale(1.03); }
 .states { display: grid; gap: .9rem; margin-block: 1rem; font: .95rem/1.5 var(--sans); }
 .states dt { margin-bottom: .3rem; }
 .states dd { margin: 0; }
+
+/* Personal editorial newspaper */
+.editorial-paper { max-width: 1080px; margin: 0 auto; padding: 1.5rem clamp(1rem, 4vw, 3rem) 4rem; }
+.editorial-banner { text-align: center; padding: 2.5rem 0 1.5rem; border-bottom: 4px double currentColor; }
+.editorial-banner h1 { font-family: Georgia, serif; font-size: clamp(2.8rem, 8vw, 5.8rem); line-height: 1; margin: .5rem 0; letter-spacing: -.05em; }
+.editorial-kicker, .editorial-magazine-label { font-size: .75rem; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; }
+.editorial-archive, .editorial-contents { display: flex; flex-wrap: wrap; gap: .6rem 1rem; padding: 1rem 0; border-bottom: 1px solid #b6b1a6; }
+.editorial-archive a, .editorial-contents a { color: inherit; font-size: .85rem; }
+.editorial-archive a[aria-current=page] { font-weight: 700; }
+.editorial-disclosure { font-size: .8rem; opacity: .8; }
+.editorial-news { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2rem; margin: 2rem 0; }
+.editorial-article { border-top: 1px solid #b6b1a6; padding: 1.1rem 0; overflow-wrap: anywhere; }
+.editorial-news > :first-child { grid-column: 1 / -1; border-top: 3px solid currentColor; }
+.editorial-article h2 { font-family: Georgia, serif; font-size: clamp(1.6rem, 3vw, 2.6rem); line-height: 1.15; margin: .5rem 0; }
+.editorial-article p { font-family: Georgia, serif; font-size: 1.08rem; line-height: 1.7; margin: .8rem 0; }
+.editorial-article .editorial-lead { font-weight: 600; font-size: 1.2rem; }
+.editorial-article sup { font-family: sans-serif; font-size: .65em; opacity: .75; }
+.editorial-sources { font-size: .82rem; margin-top: 1rem; }
+.editorial-magazine { background: #eee9df; color: #24231f; padding: clamp(1.3rem, 5vw, 4rem); margin: 3rem 0; }
+.editorial-magazine .editorial-article { max-width: 740px; margin: 1rem auto; }
+.editorial-magazine-label { text-align: center; }
+.editorial-magazine h2 { font-size: clamp(2rem, 5vw, 4rem); }
+@media (max-width: 700px) { .editorial-news { grid-template-columns: 1fr; } }

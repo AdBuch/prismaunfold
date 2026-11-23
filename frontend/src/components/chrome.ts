@@ -3,7 +3,7 @@ import { html, type Raw } from '../lib/util.ts';
 import { runtime } from '../runtime.ts';
 import { demoBanner } from './ui.ts';
 
-export type NavKey = 'edition' | 'archive' | 'magazine' | 'preferences' | 'about' | '';
+export type NavKey = 'edition' | 'editorial' | 'archive' | 'magazine' | 'preferences' | 'about' | '';
 
 export function siteHeader(active: NavKey, latestDate?: string): Raw {
   const link = (key: NavKey, href: string, label: string) =>
@@ -17,6 +17,7 @@ export function siteHeader(active: NavKey, latestDate?: string): Raw {
     <p class="masthead__tag">Independent journalism. Many perspectives. One clearer view of the world.</p>
     <nav class="masthead__nav" aria-label="Primary">
       ${link('edition', latestDate ? paths.edition(latestDate) : '/', "Today's edition")}
+      ${!runtime.demo ? link('editorial', '/morgenbriefing', 'Morgenbriefing') : ''}
       ${link('archive', paths.archive(), 'Archive')}
       ${link('magazine', paths.magazines(), 'Magazine')}
       ${link('preferences', paths.preferences(), 'Preferences')}
