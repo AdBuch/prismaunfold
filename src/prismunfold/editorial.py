@@ -15,8 +15,10 @@ from .storage import open_store
 PUBLICATION = "morgenbriefing"
 DOMAINS = ("admin.ch", "parlament.ch", "ch.ch", "gob.pe", "un.org", "who.int",
            "europa.eu", "imf.org", "worldbank.org")
-SECTIONS = ("Schweiz", "Regional", "Peru", "Krisen", "International",
-            "Wirtschaft & Technologie", "Reisen", "Good News")
+SECTIONS = ("Schweiz Politik", "Schweiz Gesellschaft", "Schweiz Regional",
+            "Peru Politik", "Peru Gesellschaft", "Krisen- und Konfliktgebiete", "Reisen",
+            "International", "Wirtschaft, Technologie & Wissenschaft", "Good News")
+ASSESSMENTS = ("Wichtig", "Überschätzt", "Unterberichtet", "Beobachten")
 MAX_BYTES = 512 * 1024
 
 
@@ -84,6 +86,15 @@ def validate(raw, probe=http_probe):
                    sources=[source_map[s] for s in sorted(used)])
         return out
 
+    def short_item(item):
+        require(isinstance(item, dict), "Invalid short item")
+        ids = item.get("source_ids")
+        require(isinstance(ids, list) and 1 <= len(ids) <= 10 and
+                all(isinstance(s, str) and s in source_map for s in ids), "Unknown short-item source")
+        kept = list(dict.fromkeys(s for s in ids if reachable(s)))
+        require(bool(kept), "Short item has no reachable source")
+        return dict(text=string(item.get("text"), 900), sources=[source_map[s] for s in kept])
+
     articles = raw.get("articles")
     require(isinstance(articles, list) and 6 <= len(articles) <= 12, "Need 6–12 news articles")
     good, warnings = [], []
@@ -95,7 +106,22 @@ def validate(raw, probe=http_probe):
     require(len(good) >= 5 and len(good) * 2 >= len(articles), "Too few complete articles survived")
     magazine = article(raw.get("magazine"), True)
     require(len({a["section"] for a in good}) >= 3, "Insufficient section diversity")
-    return dict(publication=PUBLICATION, provider="codex", date=day,
+    extras = {}
+    if raw.get("random") is not None:
+        try:
+            extras["random"] = short_item(raw["random"])
+        except ValueError as exc:
+            warnings.append(f"Random omitted: {exc}")
+    assessments = raw.get("lagebild", {})
+    require(isinstance(assessments, dict) and all(k in ASSESSMENTS for k in assessments), "Invalid Lagebild")
+    extras["lagebild"] = []
+    for category in ASSESSMENTS:
+        if category in assessments:
+            try:
+                extras["lagebild"].append(dict(category=category, **short_item(assessments[category])))
+            except ValueError as exc:
+                warnings.append(f"Lagebild {category} omitted: {exc}")
+    return dict(publication=PUBLICATION, provider="codex", date=day, **extras,
                 title="Morgenbriefing", articles=good, magazine=magazine, warnings=warnings,
                 disclosure="KI-redaktionell erstellt. Quellenlinks geprüft; Aussagen nicht unabhängig verifiziert.")
 
@@ -116,7 +142,7 @@ def main():
     if mode == "history":
         store = open_store(os.environ["DATABASE_URL"])
         try:
-            print(json.dumps([{"date": e["date"], "headlines": [a["headline"] for a in e["articles"]],
+            print(json.dumps([{"date": e["date"], "headlines": [{"section": a["section"], "headline": a["headline"]} for a in e["articles"]],
                                "magazine": e["magazine"]["headline"]} for e in editions(store)[:7]], ensure_ascii=False))
         finally:
             store.close()
