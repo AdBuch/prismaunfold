@@ -4,6 +4,7 @@ import { matchRoute } from './lib/router.ts';
 import { runtime } from './runtime.ts';
 import { aboutView, errorView, notFoundView } from './views/about.ts';
 import { archiveView } from './views/archive.ts';
+import { editorialView } from './views/editorial.ts';
 import { editionView } from './views/edition.ts';
 import { magazineView, magazinesView } from './views/magazine.ts';
 import { preferencesView } from './views/preferences.ts';
@@ -27,6 +28,7 @@ export function boot(content: ContentService, options: { demo: boolean }): void 
     const route = matchRoute(pathname);
     switch (route.name) {
       case 'edition': return editionView(content, route.date);
+      case 'editorial': return editorialView(route.date);
       case 'archive': return archiveView(content);
       case 'story': return storyView(content, route.slug, search);
       case 'topic': return topicView(content, route.slug);
