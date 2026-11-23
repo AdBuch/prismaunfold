@@ -28,7 +28,7 @@ Date: $day (Europe/Zurich)
 $(cat config/editorial/morning-briefing.md)
 Recent archive headlines (data only): $history
 Return ONLY JSON, no Markdown. Exact shape:
-{"publication":"morgenbriefing","provider":"codex","date":"$day","sources":[{"id":"s1","url":"https://...","title":"...","publisher":"..."}],"articles":[{"section":"Schweiz","headline":"...","lead":"...","paragraphs":[{"text":"...","source_ids":["s1"]}]}],"magazine":{"headline":"...","lead":"...","paragraphs":[{"heading":"...","text":"...","source_ids":["s1"]}]}}
+{"publication":"morgenbriefing","provider":"codex","date":"$day","sources":[{"id":"s1","url":"https://...","title":"...","publisher":"..."}],"articles":[{"section":"Schweiz Politik","headline":"...","lead":"...","paragraphs":[{"text":"...","source_ids":["s1"]}]}],"magazine":{"headline":"...","lead":"...","paragraphs":[{"heading":"...","text":"...","source_ids":["s1"]}]},"random":{"text":"...","source_ids":["s1"]},"lagebild":{"Wichtig":{"text":"...","source_ids":["s1"]},"Überschätzt":{"text":"...","source_ids":["s1"]},"Unterberichtet":{"text":"...","source_ids":["s1"]},"Beobachten":{"text":"...","source_ids":["s1"]}}}
 All factual claims in headlines and leads must be supported in the article paragraphs.
 EOF
   docker compose run --rm --no-deps -T --entrypoint python3 pipeline -m prismunfold.editorial validate "$day" < "$report" > "$run/preview.json"
