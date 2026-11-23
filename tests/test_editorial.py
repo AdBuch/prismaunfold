@@ -8,7 +8,7 @@ from prismunfold.storage import open_store
 
 
 def sample():
-    sections = ["Schweiz", "Regional", "Peru", "Krisen", "International", "Good News"]
+    sections = ["Schweiz Politik", "Schweiz Regional", "Peru Politik", "Krisen- und Konfliktgebiete", "International", "Good News"]
     def paragraphs(n, words):
         return [{"text": " ".join(["Beispiel"] * words), "source_ids": ["a", "b"]} for _ in range(n)]
     return {"publication": "morgenbriefing", "provider": "codex", "date": "2026-11-24",
@@ -33,6 +33,15 @@ class EditorialTests(unittest.TestCase):
                 self.assertTrue(Path(export_editorial(store, tmp)).exists())
             finally:
                 store.close()
+
+    def test_extra_sections(self):
+        raw = sample()
+        raw["random"] = {"text": "Belegter Fakt", "source_ids": ["a"]}
+        raw["lagebild"] = {"Wichtig": {"text": "Analyse", "source_ids": ["b"]}}
+        result = validate(raw, lambda url: True)
+        self.assertEqual(result["random"]["text"], "Belegter Fakt")
+        self.assertEqual(result["lagebild"][0]["category"], "Wichtig")
+        self.assertEqual(result["lagebild"][0]["sources"][0]["id"], "b")
 
     def test_missing_source_omits_whole_article(self):
         raw = sample()
