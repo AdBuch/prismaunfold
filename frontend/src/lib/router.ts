@@ -1,6 +1,6 @@
 export type Route =
   | { name: 'edition'; date: 'today' | string }
-  | { name: 'editorial'; date?: string }
+  | { name: 'editorial'; date?: string; articleIndex?: number }
   | { name: 'archive' }
   | { name: 'story'; slug: string }
   | { name: 'topic'; slug: string }
@@ -17,6 +17,7 @@ export function matchRoute(pathname: string): Route {
   const [a, b] = seg;
   if (seg.length === 0) return { name: 'edition', date: 'today' };
   if (a === 'edition' && seg.length === 2 && b) return { name: 'edition', date: b };
+  if (a === 'morgenbriefing' && seg.length === 4 && b && seg[2] === 'artikel' && /^\d+$/.test(seg[3] ?? '')) return { name: 'editorial', date: b, articleIndex: Number(seg[3]) };
   if (a === 'morgenbriefing' && seg.length <= 2) return { name: 'editorial', date: b };
   if (a === 'archive' && seg.length === 1) return { name: 'archive' };
   if (a === 'story' && seg.length === 2 && b) return { name: 'story', slug: b };
