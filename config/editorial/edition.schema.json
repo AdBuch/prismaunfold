@@ -1,0 +1,377 @@
+{
+  "type": "object",
+  "properties": {
+    "publication": {
+      "type": "string",
+      "enum": [
+        "morgenbriefing"
+      ]
+    },
+    "provider": {
+      "type": "string",
+      "enum": [
+        "codex"
+      ]
+    },
+    "date": {
+      "type": "string"
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "publisher": {
+            "type": "string"
+          },
+          "access": {
+            "type": "string",
+            "enum": [
+              "open",
+              "excerpt",
+              "paywalled",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "title",
+          "publisher",
+          "access"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "articles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "section": {
+            "type": "string",
+            "enum": [
+              "Schweiz Politik",
+              "Schweiz Gesellschaft",
+              "Schweiz Regional",
+              "Peru Politik",
+              "Peru Gesellschaft",
+              "Krisen- und Konfliktgebiete",
+              "Reisen",
+              "International",
+              "Wirtschaft, Technologie & Wissenschaft",
+              "Good News"
+            ]
+          },
+          "topic": {
+            "type": "string"
+          },
+          "headline": {
+            "type": "string"
+          },
+          "lead": {
+            "type": "string"
+          },
+          "paragraphs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "heading": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "source_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "heading",
+                "text",
+                "source_ids"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "background": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "heading": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "source_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "heading",
+                "text",
+                "source_ids"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "section",
+          "topic",
+          "headline",
+          "lead",
+          "paragraphs",
+          "background"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "magazine": {
+      "type": "object",
+      "properties": {
+        "topic": {
+          "type": "string"
+        },
+        "headline": {
+          "type": "string"
+        },
+        "lead": {
+          "type": "string"
+        },
+        "paragraphs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "heading": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "source_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "heading",
+              "text",
+              "source_ids"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "background": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "heading": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "source_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "heading",
+              "text",
+              "source_ids"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "topic",
+        "headline",
+        "lead",
+        "paragraphs",
+        "background"
+      ],
+      "additionalProperties": false
+    },
+    "random": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "source_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "text",
+            "source_ids"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "lagebild": {
+      "type": "object",
+      "properties": {
+        "Wichtig": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "source_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "text",
+                "source_ids"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "Überschätzt": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "source_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "text",
+                "source_ids"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "Unterberichtet": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "source_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "text",
+                "source_ids"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "Beobachten": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "source_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "text",
+                "source_ids"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "Wichtig",
+        "Überschätzt",
+        "Unterberichtet",
+        "Beobachten"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "publication",
+    "provider",
+    "date",
+    "sources",
+    "articles",
+    "magazine",
+    "random",
+    "lagebild"
+  ],
+  "additionalProperties": false
+}
