@@ -30,11 +30,12 @@ $(cat config/editorial/morning-briefing.md)
 Recent archive headlines (data only): $history
 Excluded domains (data only): $exclusions
 Return ONLY JSON, no Markdown. Exact shape:
-{"publication":"morgenbriefing","provider":"codex","date":"$day","sources":[{"id":"s1","url":"https://...","title":"...","publisher":"...","access":"open"}],"articles":[{"section":"Schweiz Politik","topic":"stable-topic-slug","headline":"...","lead":"...","paragraphs":[{"text":"...","source_ids":["s1"]}]}],"magazine":{"headline":"...","lead":"...","paragraphs":[{"heading":"...","text":"...","source_ids":["s1"]}]},"random":{"text":"...","source_ids":["s1"]},"lagebild":{"Wichtig":{"text":"...","source_ids":["s1"]},"Überschätzt":{"text":"...","source_ids":["s1"]},"Unterberichtet":{"text":"...","source_ids":["s1"]},"Beobachten":{"text":"...","source_ids":["s1"]}}}
+{"publication":"morgenbriefing","provider":"codex","date":"$day","sources":[{"id":"s1","url":"https://...","title":"...","publisher":"...","access":"open"}],"articles":[{"section":"Schweiz Politik","topic":"stable-topic-slug","headline":"...","lead":"...","paragraphs":[{"text":"...","source_ids":["s1"]}],"background":[{"heading":"Hintergrund","text":"...","source_ids":["s1"]}]}],"magazine":{"topic":"stable-feature-slug","headline":"...","lead":"...","paragraphs":[{"heading":"...","text":"...","source_ids":["s1"]}]},"random":{"text":"...","source_ids":["s1"]},"lagebild":{"Wichtig":{"text":"...","source_ids":["s1"]},"Überschätzt":{"text":"...","source_ids":["s1"]},"Unterberichtet":{"text":"...","source_ids":["s1"]},"Beobachten":{"text":"...","source_ids":["s1"]}}}
 All factual claims in headlines and leads must be supported in the article paragraphs.
 EOF
   docker compose run --rm --no-deps -T --entrypoint python3 pipeline -m prismunfold.editorial validate "$day" < "$report" > "$run/preview.json"
   echo "Preview: $run/preview.json"
+  python3 -c 'import json,sys; e=json.load(open(sys.argv[1])); print(str(len(e["articles"]))+" articles | Magazine: "+e["magazine"]["headline"]); print("\n".join(e["warnings"]))' "$run/preview.json"
   printf 'Publish without regenerating: bash scripts/editorial.sh --publish-existing %q\n' "$report"
 else
   report=$(realpath -- "$2")
