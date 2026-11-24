@@ -16,7 +16,7 @@ Classic Editorial + Modern Magazine + My PrismUnfold. Distinct editions from Cha
 - [ ] Jump-host/WireGuard route verification, Caddy forwarding, unfold.krokero.ch DNS/TLS; no public exposure until approved.
 
 ## Editorial milestone (this branch)
-Canonical target: [Morgenbriefing Weltlage](EDITORIAL_SPEC.md), supplied 2026-11-24. The executable prompt v3 is derived from this specification.
+Canonical target: [Morgenbriefing Weltlage](EDITORIAL_SPEC.md), supplied 2026-11-24. The executable prompt v4 is derived from this specification.
 - [x] Versioned German editorial instructions; coherent news articles plus standalone long-form magazine.
 - [x] Separate editorial namespace in existing editions table, static JSON export and dedicated newspaper route.
 - [x] Explicit dry-run / publish-existing workflow; no second model call, no auto-publication.
@@ -41,3 +41,6 @@ After merging and deploying, run `bash scripts/editorial.sh --dry-run`; read pre
 
 ## Deployment regression 2026-11-24
 The merged editorial build reported EACCES importing editorial.py, and the user reported missing UI styling. Verified original stylesheet remains byte-for-byte intact as prefix of current CSS. Docker image source/static artifact modes are now normalised; runtime confirmation pending. Deploy as the normal deployment user (not sudo), keep umask 022 for Git checkout, and verify CSS HTTP 200/text-css plus Python import before generating an edition. Configuration bind mounts retain host permissions; do not recursively expose secrets or authentication volumes.
+
+## Editorial reading experience v4
+Three levels: complete daily newspaper, internal thematic reading and edition history, external original reporting. Paywalled sources may be supplementary references; accessible evidence is required, explicit catalogue exclusions remain, no access circumvention. Broad research is subject to source rights. Codex remains the only configured editorial runner. No shell needed, sandbox unchanged. UI uses original PrismUnfold palette and typography. Runtime acceptance pending.
