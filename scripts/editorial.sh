@@ -36,6 +36,7 @@ EOF
   docker compose run --rm --no-deps -T --entrypoint python3 pipeline -m prismunfold.editorial validate "$day" < "$report" > "$run/preview.json"
   echo "Preview: $run/preview.json"
   python3 -c 'import json,sys; e=json.load(open(sys.argv[1])); print(str(len(e["articles"]))+" articles | Magazine: "+e["magazine"]["headline"]); print("\n".join(e["warnings"]))' "$run/preview.json"
+  if [[ -n ${EDITORIAL_READY_POINTER:-} ]]; then printf '%s\n' "$report" > "$EDITORIAL_READY_POINTER"; fi
   printf 'Publish without regenerating: bash scripts/editorial.sh --publish-existing %q\n' "$report"
 else
   report=$(realpath -- "$2")
@@ -44,6 +45,6 @@ else
     docker compose stop pipeline
     trap 'docker compose start pipeline >&2' EXIT
   fi
-  docker compose run --rm --no-deps -T --entrypoint python3 pipeline -m prismunfold.editorial publish "$day" < "$report" > /dev/null
+  docker compose run --rm --no-deps -T -e EDITORIAL_AUTO="${EDITORIAL_AUTO:-0}" --entrypoint python3 pipeline -m prismunfold.editorial publish "$day" < "$report" > /dev/null
   echo "Published: /morgenbriefing"
 fi
