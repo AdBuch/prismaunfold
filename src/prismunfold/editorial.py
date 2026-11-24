@@ -34,8 +34,11 @@ def string(value, limit):
 
 def excluded_domains():
     catalog = json.loads(Path(os.environ.get("EDITORIAL_CATALOG", "catalog/sources.json")).read_text(encoding="utf-8"))
-    return {(urlsplit(item["feed_url"]).hostname or "").removeprefix("www.").removeprefix("feeds.")
-            for item in catalog if item.get("ai_policy") == "exclude" and item.get("feed_url")}
+    domains = {(urlsplit(item["feed_url"]).hostname or "").removeprefix("www.").removeprefix("feeds.")
+               for item in catalog if item.get("ai_policy") == "exclude" and item.get("feed_url")}
+    if "bbci.co.uk" in domains:
+        domains.update(("bbc.com", "bbc.co.uk"))
+    return domains
 
 
 def validate(raw, probe=http_probe, excluded=None):
@@ -102,6 +105,16 @@ def validate(raw, probe=http_probe, excluded=None):
         topic = item.get('topic', '')
         if isinstance(topic, str) and re.fullmatch(r'[a-z0-9][a-z0-9-]{0,79}', topic):
             out['topic'] = topic
+        background = item.get("background", [])
+        require(isinstance(background, list) and len(background) <= 5, "Invalid background")
+        out["background"] = []
+        for entry in background:
+            try:
+                extra = short_item(entry)
+                extra["heading"] = string(entry.get("heading"), 120)
+                out["background"].append(extra)
+            except ValueError:
+                continue
         return out
 
     def short_item(item):
@@ -114,7 +127,7 @@ def validate(raw, probe=http_probe, excluded=None):
         return dict(text=string(item.get("text"), 900), sources=[source_map[s] for s in kept])
 
     articles = raw.get("articles")
-    require(isinstance(articles, list) and 6 <= len(articles) <= 12, "Need 6–12 news articles")
+    require(isinstance(articles, list) and 6 <= len(articles) <= 16, "Need 6–16 news articles")
     good, warnings = [], []
     for idx, item in enumerate(articles):
         try:
@@ -139,6 +152,15 @@ def validate(raw, probe=http_probe, excluded=None):
                 extras["lagebild"].append(dict(category=category, **short_item(assessments[category])))
             except ValueError as exc:
                 warnings.append(f"Lagebild {category} omitted: {exc}")
+    good.sort(key=lambda a: SECTIONS.index(a["section"]))
+    covered = {a["section"] for a in good}
+    missing = [section for section in SECTIONS if section not in covered]
+    if missing:
+        warnings.append("Keine veröffentlichte Meldung: " + ", ".join(missing))
+    if "random" not in extras:
+        warnings.append("Random des Tages fehlt")
+    if len(extras["lagebild"]) != len(ASSESSMENTS):
+        warnings.append("Lagebild ist unvollständig")
     return dict(publication=PUBLICATION, provider="codex", date=day, **extras,
                 title="Morgenbriefing", articles=good, magazine=magazine, warnings=warnings,
                 disclosure="KI-redaktionell erstellt. Stützende Quellenlinks geprüft; Paywall-Verweise können unzugänglich sein. Aussagen nicht unabhängig verifiziert.")
@@ -160,7 +182,7 @@ def main():
     if mode == "history":
         store = open_store(os.environ["DATABASE_URL"])
         try:
-            print(json.dumps([{"date": e["date"], "headlines": [{"section": a["section"], "headline": a["headline"]} for a in e["articles"]],
+            print(json.dumps([{"date": e["date"], "headlines": [{"section": a["section"], "headline": a["headline"], "topic": a.get("topic", "")} for a in e["articles"]],
                                "magazine": e["magazine"]["headline"]} for e in editions(store)[:7]], ensure_ascii=False))
         finally:
             store.close()
