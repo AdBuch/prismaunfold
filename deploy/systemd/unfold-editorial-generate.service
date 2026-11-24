@@ -1,0 +1,14 @@
+[Unit]
+Description=PrismUnfold morning edition research and validation
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=adrian
+WorkingDirectory=/opt/unfold
+Environment=HOME=/home/adrian
+UMask=0077
+ExecStart=/bin/bash /opt/unfold/scripts/editorial-scheduled.sh generate
+TimeoutStartSec=55min
