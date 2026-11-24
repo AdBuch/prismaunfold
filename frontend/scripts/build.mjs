@@ -1,5 +1,5 @@
 import { build, context } from 'esbuild';
-import { copyFile, mkdir } from 'node:fs/promises';
+import { chmod, copyFile, mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 const root = new URL('../', import.meta.url);
@@ -24,6 +24,8 @@ async function copyStatic() {
   await mkdir(p('dist'), { recursive: true });
   await copyFile(p('src/index.html'), p('dist/index.html'));
   await copyFile(p('src/styles/main.css'), p('dist/styles.css'));
+  await chmod(p('dist/index.html'), 0o644);
+  await chmod(p('dist/styles.css'), 0o644);
 }
 
 export async function run({ watch = false } = {}) {
