@@ -8,9 +8,10 @@ COPY frontend/package.json ./
 # No lockfile is committed yet, so versions float within the ranges in package.json.
 RUN npm install --no-audit --no-fund
 COPY frontend/ ./
-RUN npm run typecheck && npm run build
+RUN npm run typecheck && npm run build \
+ && chmod -R a+rX /frontend/dist
 
 FROM nginxinc/nginx-unprivileged:stable-alpine
-COPY docker/web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --chmod=644 docker/web/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /frontend/dist/ /usr/share/nginx/html/
 EXPOSE 8080
