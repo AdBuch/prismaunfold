@@ -28,7 +28,7 @@ export function boot(content: ContentService, options: { demo: boolean }): void 
     const route = matchRoute(pathname);
     switch (route.name) {
       case 'edition': return editionView(content, route.date);
-      case 'editorial': return editorialView(route.date);
+      case 'editorial': return editorialView(route.date, route.articleIndex);
       case 'archive': return archiveView(content);
       case 'story': return storyView(content, route.slug, search);
       case 'topic': return topicView(content, route.slug);
