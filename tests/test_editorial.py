@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from tempfile import TemporaryDirectory
 from pathlib import Path
 
-from prismunfold.editorial import validate, editions, export_editorial
+from prismunfold.editorial import validate, editions, export_editorial, prepare_research
 from prismunfold.storage import open_store
 
 
@@ -61,3 +61,21 @@ class EditorialTests(unittest.TestCase):
         raw["sources"][0]["url"] = "https://example.com/article"
         with self.assertRaises(ValueError):
             validate(raw, lambda url: True)
+
+
+    def test_research_omits_notes_with_unreachable_evidence_before_writing(self):
+        raw = sample()
+        raw["sources"].append({"id": "c", "url": "https://www.un.org/missing", "publisher": "UN", "title": "Missing"})
+        dossiers = [{"section": article["section"], "subject": article["headline"], "notes": [
+            {"text": "A documented development", "source_ids": ["a"]},
+            {"text": "A mixed claim", "source_ids": ["a", "c"]},
+        ]} for article in raw["articles"]]
+        dossiers.append({"section": "Magazin", "subject": "Background", "notes": [
+            {"text": "Official records", "source_ids": ["a", "b"]},
+        ]})
+        research = {"sources": raw["sources"], "dossiers": dossiers}
+        prepared = prepare_research(research, lambda url: not url.endswith("/missing"))
+        self.assertEqual({source["id"] for source in prepared["sources"]}, {"a", "b"})
+        self.assertEqual(prepared["dossiers"][0]["notes"], dossiers[0]["notes"][:1])
+        with self.assertRaisesRegex(ValueError, "six sourced news dossiers"):
+            prepare_research({"sources": raw["sources"], "dossiers": dossiers[1:]}, lambda url: True)

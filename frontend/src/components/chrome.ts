@@ -16,8 +16,8 @@ export function siteHeader(active: NavKey, latestDate?: string): Raw {
     </a>
     <p class="masthead__tag">Independent journalism. Many perspectives. One clearer view of the world.</p>
     <nav class="masthead__nav" aria-label="Primary">
-      ${link('edition', latestDate ? paths.edition(latestDate) : '/', "Today's edition")}
       ${!runtime.demo ? link('editorial', '/morgenbriefing', 'Morgenbriefing') : ''}
+      ${link('edition', paths.edition(latestDate ?? 'today'), runtime.demo ? "Today's edition" : 'Feed-Überblick')}
       ${link('archive', paths.archive(), 'Archive')}
       ${link('magazine', paths.magazines(), 'Magazine')}
       ${link('preferences', paths.preferences(), 'Preferences')}

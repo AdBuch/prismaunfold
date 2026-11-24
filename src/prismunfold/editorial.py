@@ -32,12 +32,7 @@ def string(value, limit):
     return value.strip()
 
 
-def validate(raw, probe=http_probe):
-    require(isinstance(raw, dict) and raw.get("publication") == PUBLICATION, "Wrong publication")
-    require(raw.get("provider") == "codex", "Wrong provider")
-    day = string(raw.get("date"), 10)
-    require(date.fromisoformat(day).isoformat() == day, "Invalid edition date")
-    sources = raw.get("sources")
+def read_sources(sources):
     require(isinstance(sources, list) and 2 <= len(sources) <= 80, "Invalid sources")
     source_map = {}
     for item in sources:
@@ -49,6 +44,51 @@ def validate(raw, probe=http_probe):
         require(any(host == d or host.endswith("." + d) for d in DOMAINS), "Source outside allowlist")
         source_map[sid] = dict(id=sid, url=url, title=string(item.get("title"), 300),
                                publisher=string(item.get("publisher"), 120))
+    require(len({source["url"] for source in source_map.values()}) == len(source_map), "Duplicate source URL")
+    return source_map
+
+
+def prepare_research(raw, probe=http_probe):
+    """Keep only evidence that the writing pass can cite."""
+    require(isinstance(raw, dict), "Invalid research")
+    sources = read_sources(raw.get("sources"))
+    dossiers = raw.get("dossiers")
+    require(isinstance(dossiers, list) and len(dossiers) <= 30, "Invalid dossiers")
+    reachable = {sid for sid, source in sources.items() if probe(source["url"])}
+    kept = []
+    used = set()
+    for dossier in dossiers:
+        require(isinstance(dossier, dict), "Invalid dossier")
+        section = string(dossier.get("section"), 80)
+        subject = string(dossier.get("subject"), 200)
+        notes = dossier.get("notes")
+        require(isinstance(notes, list) and 1 <= len(notes) <= 30, "Invalid research notes")
+        usable = []
+        for note in notes:
+            require(isinstance(note, dict), "Invalid note")
+            text = string(note.get("text"), 1800)
+            ids = note.get("source_ids")
+            require(isinstance(ids, list) and 1 <= len(ids) <= 10 and
+                    all(isinstance(sid, str) and sid in sources for sid in ids), "Unknown research source")
+            # A note can combine distinct claims from its cited documents.
+            if set(ids) <= reachable:
+                usable.append(dict(text=text, source_ids=ids))
+                used.update(ids)
+        if usable:
+            kept.append(dict(section=section, subject=subject, notes=usable))
+    require(sum(d["section"] in SECTIONS for d in kept) >= 6, "Research needs six sourced news dossiers")
+    require(any(d["section"] == "Magazin" and len({sid for note in d["notes"]
+                                                 for sid in note["source_ids"]}) >= 2 for d in kept),
+            "Magazine research needs two reachable documents")
+    return dict(sources=[sources[sid] for sid in sorted(used)], dossiers=kept)
+
+
+def validate(raw, probe=http_probe):
+    require(isinstance(raw, dict) and raw.get("publication") == PUBLICATION, "Wrong publication")
+    require(raw.get("provider") == "codex", "Wrong provider")
+    day = string(raw.get("date"), 10)
+    require(date.fromisoformat(day).isoformat() == day, "Invalid edition date")
+    source_map = read_sources(raw.get("sources"))
     cache = {}
     def reachable(sid):
         url = source_map[sid]["url"]
@@ -147,10 +187,14 @@ def main():
         finally:
             store.close()
         return
-    require(mode in ("validate", "publish"), "Unknown mode")
+    require(mode in ("research", "validate", "publish"), "Unknown mode")
     data = sys.stdin.buffer.read(MAX_BYTES + 1)
     require(len(data) <= MAX_BYTES, "Edition too large")
-    payload = validate(json.loads(data))
+    raw = json.loads(data)
+    if mode == "research":
+        print(json.dumps(prepare_research(raw), ensure_ascii=False))
+        return
+    payload = validate(raw)
     require(payload["date"] == sys.argv[2], "Edition date mismatch")
     if mode == "publish":
         store = open_store(os.environ["DATABASE_URL"])

@@ -16,16 +16,17 @@ Classic Editorial + Modern Magazine + My PrismUnfold. Distinct editions from Cha
 - [ ] Jump-host/WireGuard route verification, Caddy forwarding, unfold.krokero.ch DNS/TLS; no public exposure until approved.
 
 ## Editorial milestone (this branch)
-Canonical target: [Morgenbriefing Weltlage](EDITORIAL_SPEC.md), supplied 2026-11-24. The executable prompt v3 is derived from this specification.
+Canonical target: [Morgenbriefing Weltlage](EDITORIAL_SPEC.md), supplied 2026-11-24. The executable prompt v4 is derived from this specification.
 - [x] Versioned German editorial instructions; coherent news articles plus standalone long-form magazine.
 - [x] Separate editorial namespace in existing editions table, static JSON export and dedicated newspaper route.
-- [x] Explicit dry-run / publish-existing workflow; no second model call, no auto-publication.
+- [x] Explicit dry-run / publish-existing workflow. The dry run uses two Codex calls; publication reuses the reviewed output.
 - [x] Recent headline history passed to writer; independent source links retained per paragraph.
 - [ ] CI and end-to-end verification on Proxmox, editorial acceptance versus original ChatGPT briefing.
 - [x] Exact editorial rubrics and optional source-linked Random des Tages / four-category Lagebild in edition model and UI.
 - [ ] Travel personalisation from private configuration, target length calibrated against an original issue, reliable continental rotation.
 - [ ] Stronger independent claim verification; link reachability is not truth. Source rights review and network egress restrictions.
-- [ ] Separate research and writing stages, automated repetition controls, broader permitted sources.
+- [x] Separate research and writing stages. A link check filters the research dossier before the writing pass.
+- [ ] Automated repetition controls and broader permitted sources.
 - [ ] Independent provider adapters and publication selector; daily 07:00 Europe/Zurich scheduler only after acceptance.
 
 ## Architecture
@@ -41,3 +42,14 @@ After merging and deploying, run `bash scripts/editorial.sh --dry-run`; read pre
 
 ## Deployment regression 2026-11-24
 The merged editorial build reported EACCES importing editorial.py, and the user reported missing UI styling. Verified original stylesheet remains byte-for-byte intact as prefix of current CSS. Docker image source/static artifact modes are now normalised; runtime confirmation pending. Deploy as the normal deployment user (not sudo), keep umask 022 for Git checkout, and verify CSS HTTP 200/text-css plus Python import before generating an edition. Configuration bind mounts retain host permissions; do not recursively expose secrets or authentication volumes.
+
+
+## Editorial front page
+
+The real site's home page opens the latest Morgenbriefing, with a clear empty
+state before the first publication. The feed desk stays available under
+`/edition/today`. The dry run keeps the raw research, the source-filtered dossier
+and the draft beside the preview for editorial review. Only the research phase
+uses web search. The writing phase receives that dossier, and the publication
+manifest is populated from the dossier's source list. Reachability checks can
+rule out broken links, while relevance and factual support still require review.

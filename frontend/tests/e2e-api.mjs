@@ -19,8 +19,17 @@ const test = async (name, fn, viewport = { width: 1280, height: 900 }) => {
 };
 const ready = (page, selector) => page.waitForSelector(selector, { timeout: 15000 });
 
-await test('front page shows a real lead story and no demo banner', async (p) => {
+await test('front page opens the editorial edition and links to the feed desk', async (p) => {
   await p.goto(base + '/');
+  await ready(p, '.editorial-banner h1');
+  assert.equal(await p.locator('.editorial-banner h1').innerText(), 'Morgenbriefing');
+  const feedLink = p.getByRole('link', { name: 'Feed-Überblick' });
+  await feedLink.click();
+  await ready(p, '.lead__title');
+});
+
+await test('feed desk shows a real lead story and no demo banner', async (p) => {
+  await p.goto(base + '/edition/today');
   await ready(p, '.lead__title');
   const headline = await p.locator('.lead__title').innerText();
   assert.ok(headline.trim().length > 0);
@@ -31,7 +40,7 @@ await test('front page shows a real lead story and no demo banner', async (p) =>
 });
 
 await test('story reader links every sentence to a source and states how sure we are', async (p) => {
-  await p.goto(base + '/');
+  await p.goto(base + '/edition/today');
   await ready(p, '.lead__title a');
   await p.locator('.lead__title a').click();
   await ready(p, '.story__title');
@@ -52,7 +61,7 @@ await test('story reader links every sentence to a source and states how sure we
 await test('archive, timeline, preferences and about are reachable', async (p) => {
   await p.goto(base + '/archive');
   await ready(p, '.archive-item');
-  await p.goto(base + '/');
+  await p.goto(base + '/edition/today');
   await ready(p, '.lead__title a');
   await p.locator('.lead__title a').click();
   await ready(p, '.story__title');

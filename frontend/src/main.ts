@@ -25,6 +25,7 @@ export function boot(content: ContentService, options: { demo: boolean }): void 
   let renderToken = 0;
 
   async function resolve(pathname: string, search: URLSearchParams): Promise<ViewResult> {
+    if (!options.demo && pathname === '/') return editorialView();
     const route = matchRoute(pathname);
     switch (route.name) {
       case 'edition': return editionView(content, route.date);
