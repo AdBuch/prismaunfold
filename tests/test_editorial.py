@@ -56,8 +56,16 @@ class EditorialTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate(raw, lambda url: True)
 
-    def test_unapproved_source_rejected(self):
+    def test_excluded_source_rejected(self):
         raw = sample()
         raw["sources"][0]["url"] = "https://example.com/article"
         with self.assertRaises(ValueError):
-            validate(raw, lambda url: True)
+            validate(raw, lambda url: True, excluded={"example.com"})
+
+    def test_paywall_requires_other_support(self):
+        raw = sample()
+        raw["sources"][1]["access"] = "paywalled"
+        self.assertEqual(len(validate(raw, lambda url: "admin.ch" in url, excluded=set())["articles"]), 6)
+        raw["magazine"]["paragraphs"][0]["source_ids"] = ["b"]
+        with self.assertRaises(ValueError):
+            validate(raw, lambda url: True, excluded=set())
