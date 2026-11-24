@@ -16,7 +16,7 @@ Classic Editorial + Modern Magazine + My PrismUnfold. Distinct editions from Cha
 - [ ] Jump-host/WireGuard route verification, Caddy forwarding, unfold.krokero.ch DNS/TLS; no public exposure until approved.
 
 ## Editorial milestone (this branch)
-Canonical target: [Morgenbriefing Weltlage](EDITORIAL_SPEC.md), supplied 2026-11-24. The executable prompt v4 is derived from this specification.
+Canonical target: [Morgenbriefing Weltlage](EDITORIAL_SPEC.md), supplied 2026-11-24. The executable prompt v5 is derived from this specification.
 - [x] Versioned German editorial instructions; coherent news articles plus standalone long-form magazine.
 - [x] Separate editorial namespace in existing editions table, static JSON export and dedicated newspaper route.
 - [x] Explicit dry-run / publish-existing workflow; no second model call, no auto-publication.
@@ -44,3 +44,6 @@ The merged editorial build reported EACCES importing editorial.py, and the user 
 
 ## Editorial reading experience v4
 Three levels: complete daily newspaper, internal thematic reading and edition history, external original reporting. Paywalled sources may be supplementary references; accessible evidence is required, explicit catalogue exclusions remain, no access circumvention. Broad research is subject to source rights. Codex remains the only configured editorial runner. No shell needed, sandbox unchanged. UI uses original PrismUnfold palette and typography. Runtime acceptance pending.
+
+## Editorial v5: complete newspaper and thematic depth
+Aim for 10–16 news articles covering all ten rubrics where material warrants, plus magazine, random fact and four assessments. Record missing rubrics in validation warnings. Stable topic slugs passed into archive context. Dedicated article pages include separately researched cited background and perspectives; existing feed topic timeline linked only when it exists. Original PrismUnfold design tokens remain unchanged. This is an incremental implementation; independent fact-check, live VM validation and actual edition quality remain acceptance gates.
