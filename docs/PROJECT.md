@@ -38,3 +38,6 @@ After merging and deploying, run `bash scripts/editorial.sh --dry-run`; read pre
 - 2026-11-23: One VM, Docker Compose, 4 GB initial RAM; fresh installation because laptop data only two days old.
 - 2026-11-24: Existing Codex subscription CLI reused; first sentence-based output rejected as product direction. Dedicated editorial edition with full prose and magazine, not simply a report collector. Keep feed desk and existing reports separate.
 - Next: record test results, commit/PR references and changes to acceptance criteria here. Never mark a runtime milestone complete until observed.
+
+## Deployment regression 2026-11-24
+The merged editorial build reported EACCES importing editorial.py, and the user reported missing UI styling. Verified original stylesheet remains byte-for-byte intact as prefix of current CSS. Docker image source/static artifact modes are now normalised; runtime confirmation pending. Deploy as the normal deployment user (not sudo), keep umask 022 for Git checkout, and verify CSS HTTP 200/text-css plus Python import before generating an edition. Configuration bind mounts retain host permissions; do not recursively expose secrets or authentication volumes.
