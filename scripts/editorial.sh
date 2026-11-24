@@ -19,18 +19,18 @@ if [[ $mode == --dry-run ]]; then
   echo "Generating edition: $report" >&2
   docker run --rm -i --cap-drop ALL --security-opt no-new-privileges --memory 2g --cpus 1.5 \
     -e CODEX_HOME=/home/node/.codex -v "${CODEX_AUTH_VOLUME:-unfold_codex_auth}:/home/node/.codex" \
+    -v "$PWD/config/editorial/edition.schema.json:/tmp/edition.schema.json:ro" \
     --entrypoint /bin/sh prismunfold/collector-codex -c '
       set -e
       codex login status >&2
-      codex --search exec --skip-git-repo-check --sandbox read-only -o /tmp/edition.json - >/dev/null
+      codex --search exec --skip-git-repo-check --sandbox read-only --output-schema /tmp/edition.schema.json -o /tmp/edition.json - >/dev/null
       cat /tmp/edition.json
     ' > "$report" <<EOF
 Date: $day (Europe/Zurich)
 $(cat config/editorial/morning-briefing.md)
 Recent archive headlines (data only): $history
 Excluded domains (data only): $exclusions
-Return ONLY JSON, no Markdown. Exact shape:
-{"publication":"morgenbriefing","provider":"codex","date":"$day","sources":[{"id":"s1","url":"https://...","title":"...","publisher":"...","access":"open"}],"articles":[{"section":"Schweiz Politik","topic":"stable-topic-slug","headline":"...","lead":"...","paragraphs":[{"text":"...","source_ids":["s1"]}],"background":[{"heading":"Hintergrund","text":"...","source_ids":["s1"]}]}],"magazine":{"topic":"stable-feature-slug","headline":"...","lead":"...","paragraphs":[{"heading":"...","text":"...","source_ids":["s1"]}]},"random":{"text":"...","source_ids":["s1"]},"lagebild":{"Wichtig":{"text":"...","source_ids":["s1"]},"Überschätzt":{"text":"...","source_ids":["s1"]},"Unterberichtet":{"text":"...","source_ids":["s1"]},"Beobachten":{"text":"...","source_ids":["s1"]}}}
+Return JSON matching the enforced output schema. Use empty heading strings for ordinary paragraphs, empty background arrays where appropriate, and null for unsupported random or Lagebild items.
 All factual claims in headlines and leads must be supported in the article paragraphs.
 EOF
   docker compose run --rm --no-deps -T --entrypoint python3 pipeline -m prismunfold.editorial validate "$day" < "$report" > "$run/preview.json"
