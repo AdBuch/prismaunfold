@@ -34,6 +34,14 @@ class EditorialTests(unittest.TestCase):
             finally:
                 store.close()
 
+    def test_background_and_topic(self):
+        raw = sample()
+        raw["articles"][0]["topic"] = "swiss-politics"
+        raw["articles"][0]["background"] = [{"heading": "Kontext", "text": "Hintergrund", "source_ids": ["a"]}]
+        result = validate(raw, lambda url: True)
+        self.assertEqual(result["articles"][0]["topic"], "swiss-politics")
+        self.assertEqual(result["articles"][0]["background"][0]["heading"], "Kontext")
+
     def test_extra_sections(self):
         raw = sample()
         raw["random"] = {"text": "Belegter Fakt", "source_ids": ["a"]}
