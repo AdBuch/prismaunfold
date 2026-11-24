@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -13,8 +14,7 @@ from .linkcheck import http_probe
 from .storage import open_store
 
 PUBLICATION = "morgenbriefing"
-DOMAINS = ("admin.ch", "parlament.ch", "ch.ch", "gob.pe", "un.org", "who.int",
-           "europa.eu", "imf.org", "worldbank.org")
+ACCESS = ("open", "excerpt", "paywalled", "unknown")
 SECTIONS = ("Schweiz Politik", "Schweiz Gesellschaft", "Schweiz Regional",
             "Peru Politik", "Peru Gesellschaft", "Krisen- und Konfliktgebiete", "Reisen",
             "International", "Wirtschaft, Technologie & Wissenschaft", "Good News")
@@ -32,7 +32,14 @@ def string(value, limit):
     return value.strip()
 
 
-def validate(raw, probe=http_probe):
+def excluded_domains():
+    catalog = json.loads(Path(os.environ.get("EDITORIAL_CATALOG", "catalog/sources.json")).read_text(encoding="utf-8"))
+    return {(urlsplit(item["feed_url"]).hostname or "").removeprefix("www.").removeprefix("feeds.")
+            for item in catalog if item.get("ai_policy") == "exclude" and item.get("feed_url")}
+
+
+def validate(raw, probe=http_probe, excluded=None):
+    excluded = excluded_domains() if excluded is None else excluded
     require(isinstance(raw, dict) and raw.get("publication") == PUBLICATION, "Wrong publication")
     require(raw.get("provider") == "codex", "Wrong provider")
     day = string(raw.get("date"), 10)
@@ -46,15 +53,23 @@ def validate(raw, probe=http_probe):
         url = public_url(item.get("url"))
         require(url is not None and sid not in source_map, "Invalid or duplicate source")
         host = urlsplit(url).hostname or ""
-        require(any(host == d or host.endswith("." + d) for d in DOMAINS), "Source outside allowlist")
+        require(not any(host == d or host.endswith("." + d) for d in excluded), "Source excluded by catalogue")
+        access = item.get("access", "unknown")
+        require(access in ACCESS, "Invalid access status")
         source_map[sid] = dict(id=sid, url=url, title=string(item.get("title"), 300),
-                               publisher=string(item.get("publisher"), 120))
+                               publisher=string(item.get("publisher"), 120), access=access)
     cache = {}
     def reachable(sid):
         url = source_map[sid]["url"]
         if url not in cache:
             cache[url] = bool(probe(url))
         return cache[url]
+
+    def refs(ids):
+        unique = list(dict.fromkeys(ids))
+        require(any(source_map[s]["access"] != "paywalled" and reachable(s) for s in unique),
+                "No reachable supporting source")
+        return [s for s in unique if source_map[s]["access"] == "paywalled" or reachable(s)]
 
     def article(item, magazine=False):
         require(isinstance(item, dict), "Invalid article")
@@ -71,7 +86,7 @@ def validate(raw, probe=http_probe):
             ids = para.get("source_ids")
             require(isinstance(ids, list) and 1 <= len(ids) <= 10 and
                     all(isinstance(s, str) and s in source_map for s in ids), "Unknown paragraph source")
-            kept = list(dict.fromkeys(s for s in ids if reachable(s)))
+            kept = refs(ids)
             # Never silently remove paragraphs from coherent prose.
             require(bool(kept), "Paragraph has no reachable cited source")
             used.update(kept)
@@ -84,6 +99,9 @@ def validate(raw, probe=http_probe):
         out = dict(section=section, headline=string(item.get("headline"), 200),
                    lead=string(item.get("lead"), 600), paragraphs=result,
                    sources=[source_map[s] for s in sorted(used)])
+        topic = item.get('topic', '')
+        if isinstance(topic, str) and re.fullmatch(r'[a-z0-9][a-z0-9-]{0,79}', topic):
+            out['topic'] = topic
         return out
 
     def short_item(item):
@@ -91,7 +109,7 @@ def validate(raw, probe=http_probe):
         ids = item.get("source_ids")
         require(isinstance(ids, list) and 1 <= len(ids) <= 10 and
                 all(isinstance(s, str) and s in source_map for s in ids), "Unknown short-item source")
-        kept = list(dict.fromkeys(s for s in ids if reachable(s)))
+        kept = refs(ids)
         require(bool(kept), "Short item has no reachable source")
         return dict(text=string(item.get("text"), 900), sources=[source_map[s] for s in kept])
 
@@ -123,7 +141,7 @@ def validate(raw, probe=http_probe):
                 warnings.append(f"Lagebild {category} omitted: {exc}")
     return dict(publication=PUBLICATION, provider="codex", date=day, **extras,
                 title="Morgenbriefing", articles=good, magazine=magazine, warnings=warnings,
-                disclosure="KI-redaktionell erstellt. Quellenlinks geprüft; Aussagen nicht unabhängig verifiziert.")
+                disclosure="KI-redaktionell erstellt. Stützende Quellenlinks geprüft; Paywall-Verweise können unzugänglich sein. Aussagen nicht unabhängig verifiziert.")
 
 
 def editions(store):
