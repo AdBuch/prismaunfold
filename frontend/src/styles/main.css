@@ -422,3 +422,11 @@ a:hover .figure__frame .art { transform: scale(1.03); }
 .editorial-assessments { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1.2rem; }
 .editorial-assessments > div { border:1px solid var(--rule); padding:1rem; }
 @media(max-width:700px) { .editorial-news,.editorial-contents,.editorial-assessments { grid-template-columns:1fr; } }
+
+/* Editorial navigation and thematic reading, scoped to the personal edition. */
+.editorial-contents > a { display:flex; flex-direction:column; gap:.25rem; text-decoration:none; border-left:1px solid var(--rule); padding-left:.85rem; }
+.editorial-contents > a:hover { color:var(--accent); }
+.editorial-contents > a > span:last-child { font:500 1.05rem/1.35 var(--serif-display); }
+.editorial-background { background:var(--paper-2); padding:clamp(1rem,4vw,2rem); }
+.editorial-background h3 { margin-top:1.6rem; }
+.editorial-detail > a { font:.85rem/1.5 var(--sans); }
