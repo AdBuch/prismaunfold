@@ -2,7 +2,7 @@ import { html } from '../lib/util.ts';
 import type { ViewResult } from './types.ts';
 
 type Source = { id: string; url: string; title: string; publisher: string; access?: string };
-type Article = { topic?: string; section: string; headline: string; lead: string; paragraphs: { heading?: string; text: string; source_ids: string[] }[]; sources: Source[] };
+type Article = { background?: (ShortItem & { heading: string })[]; topic?: string; section: string; headline: string; lead: string; paragraphs: { heading?: string; text: string; source_ids: string[] }[]; sources: Source[] };
 type ShortItem = { text: string; sources: Source[] };
 type Edition = { random?: ShortItem; lagebild?: (ShortItem & { category: string })[]; date: string; articles: Article[]; magazine: Article; disclosure: string; warnings: string[] };
 
@@ -30,16 +30,18 @@ export async function editorialView(date?: string, articleIndex?: number): Promi
     const a = [...e.articles, e.magazine][articleIndex];
     if (a) {
       const related = editions.flatMap(issue => [...issue.articles, issue.magazine].map((item,i) => ({item,i,date:issue.date}))).filter(x => (x.date !== e.date || x.i !== articleIndex) && a.topic && x.item.topic === a.topic);
-      return {title:a.headline, nav:'editorial', mode: a.section === 'Magazin' ? 'magazine' : 'news', body:html`<main id="main" tabindex="-1" class="editorial-paper editorial-detail"><a data-link href="/morgenbriefing/${e.date}">← Zur Ausgabe</a>${article(a,articleIndex,e.date,true)}<section class="editorial-article"><h2>Chronologie & verwandte Artikel</h2>${related.length ? related.map(x => html`<p><a data-link href="/morgenbriefing/${x.date}/artikel/${x.i}">${x.date} · ${x.item.headline}</a></p>`) : html`<p>Noch keine weitere Berichterstattung zu diesem Thema im Archiv.</p>`}</section></main>`};
+      const existingTopic = a.topic ? await fetch('/api/v1/topics/' + encodeURIComponent(a.topic) + '.json').then(r => r.ok && (r.headers.get('content-type') || '').includes('json')).catch(() => false) : false;
+      return {title:a.headline, nav:'editorial', mode: a.section === 'Magazin' ? 'magazine' : 'news', body:html`<main id="main" tabindex="-1" class="editorial-paper editorial-detail"><a data-link href="/morgenbriefing/${e.date}">← Zur Ausgabe</a>${article(a,articleIndex,e.date,true)}${a.background?.length ? html`<section class="editorial-background editorial-article"><div class="editorial-kicker">Thema vertiefen</div><h2>Hintergrund & Perspektiven</h2>${a.background.map(b => html`<h3>${b.heading}</h3>${shortItem(b)}`)}</section>` : ''}<section class="editorial-article"><h2>Chronologie & verwandte Artikel</h2>${existingTopic ? html`<p><a data-link href="/topic/${a.topic}">PrismUnfold Themenchronologie →</a></p>` : ''}${related.length ? related.map(x => html`<p><a data-link href="/morgenbriefing/${x.date}/artikel/${x.i}">${x.date} · ${x.item.headline}</a></p>`) : html`<p>Noch keine weitere Berichterstattung zu diesem Thema im Archiv.</p>`}</section></main>`};
     }
   }
+  if (articleIndex !== undefined) return {title: "Artikel nicht gefunden", nav: "editorial", mode: "news", status: 404, body: html`<main id="main" class="page page--narrow"><h1>Artikel nicht gefunden</h1><a data-link href="/morgenbriefing">Zur Zeitung</a></main>`};
   return {title: 'Morgenbriefing', nav: 'editorial', mode: 'news', body: html`
     <main id="main" tabindex="-1" class="editorial-paper">
       <header class="editorial-banner"><div class="editorial-kicker">Weltlage · Die persönliche Ausgabe</div>
       <h1>Morgenbriefing</h1><div class="editorial-kicker">Schweiz · Peru · Welt · Magazin</div><p>${e ? new Date(e.date + 'T12:00:00Z').toLocaleDateString('de-CH', {dateStyle: 'full', timeZone: 'Europe/Zurich'}) : 'Noch keine Ausgabe'}</p></header>
       ${editions.length ? html`<nav class="editorial-archive" aria-label="Ausgaben">${editions.map(x => html`<a data-link href="/morgenbriefing/${x.date}" aria-current="${x.date === e?.date ? 'page' : 'false'}">${x.date}</a>`)}</nav>` : ''}
       ${e ? html`<p class="editorial-disclosure">${e.disclosure}</p>
-      <nav class="editorial-contents" aria-label="Inhalt">${e.articles.map((a,i) => html`<a href="#article-${i}">${a.section}: ${a.headline}</a>`)}<a href="#magazin">Magazin: ${e.magazine.headline}</a></nav>
+      <nav class="editorial-contents" aria-label="Inhalt">${e.articles.map((a,i) => html`<a href="#article-${i}"><span class="editorial-kicker">${a.section}</span><span>${a.headline}</span></a>`)}<a href="#magazin"><span class="editorial-kicker">Vertiefung des Tages</span><span>${e.magazine.headline}</span></a></nav>
       <div class="editorial-news">${e.articles.map((a,i) => article(a,i,e.date))}</div>
       <section id="magazin" class="editorial-magazine"><div class="editorial-magazine-label">MAGAZIN / VERTIEFUNG</div>${article(e.magazine,e.articles.length,e.date)}</section>
       ${e.random ? html`<section class="editorial-article"><div class="editorial-kicker">Random des Tages</div>${shortItem(e.random)}</section>` : ''}
