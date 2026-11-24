@@ -192,6 +192,13 @@ def main():
     require(len(data) <= MAX_BYTES, "Edition too large")
     payload = validate(json.loads(data))
     require(payload["date"] == sys.argv[2], "Edition date mismatch")
+    if mode == "publish" and os.environ.get("EDITORIAL_AUTO") == "1":
+        sections = {a["section"] for a in payload["articles"]}
+        require(len(payload["articles"]) >= 8 and len(sections) >= 7 and
+                {"Schweiz Politik", "Peru Politik", "International", "Good News"} <= sections and
+                payload.get("random") and
+                {x["category"] for x in payload["lagebild"]} == set(ASSESSMENTS),
+                "Automatic publication refused: incomplete edition")
     if mode == "publish":
         store = open_store(os.environ["DATABASE_URL"])
         try:
