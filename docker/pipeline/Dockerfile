@@ -13,6 +13,9 @@ COPY config/ /app/config/
 COPY catalog/ /app/catalog/
 COPY --chmod=755 docker/pipeline/scheduler.sh /app/scheduler.sh
 
+# Git checkout umask must not prevent the unprivileged runtime from reading code.
+RUN chmod -R a+rX /app/src /app/config /app/catalog
+
 ENV PYTHONPATH=/app/src PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 USER pipeline
 ENTRYPOINT ["/app/scheduler.sh"]
