@@ -5,7 +5,7 @@ catches invented or dead links. It does NOT show that the page supports the sent
 citing it (see `verification`), and a refusal (HTTP 403, paywall, anti-bot page)
 does not show that a source is fabricated.
 
-Results (see docs/SOURCE_VERIFICATION.md):
+Results (see docs/EDITORIAL_WORKFLOW.md, "Source accessibility"):
 
     reachable        2xx response
     restricted       401/402/403/407/451: authentication, payment or access policy

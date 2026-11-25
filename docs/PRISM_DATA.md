@@ -1,97 +1,114 @@
-# GitHub-Bulletins in PrismUnfold
+# GitHub-Bulletins (prism-data) in PrismUnfold
 
-Der Pipeline-Container liest `AdBuch/prism-data`, Branch `main`, über die
-GitHub Contents API. Erwartet wird `data/morgenbriefing/YYYY-MM-DD.json`.
-Die lokale Ausgabe richtet sich nach `Europe/Zurich` und wird ab 07:00 Uhr
-im bestehenden Pipeline-Zyklus gesucht. Bei zehn Minuten Zykluszeit kann die
-erste Zustellung bis zum nächsten Durchlauf dauern. Fehlt das Bulletin,
-ist GitHub vorübergehend nicht erreichbar oder enthält die Datei Fehler,
-bleiben die bestehende Ausgabe und die übrigen Quellen aktiv.
+Quelle: Repository `AdBuch/prism-data`, Branch `main`, Pfad
+`data/morgenbriefing/YYYY-MM-DD.json`, Zeitzone `Europe/Zurich`, verfügbar ab 07:00.
+Code: `src/prismunfold/bulletin.py`. Betrieb und Secrets: [OPERATIONS.md](OPERATIONS.md).
+
+Das Bulletin ist eine **KI-kuratierte Sekundärquelle** (ChatGPT). Es ergänzt RSS,
+Agenturen und die übrigen Redaktions-Worker; es ersetzt sie nicht und zählt nie als
+unabhängige Bestätigung einer Aussage. Der Import braucht keinen KI-Aufruf und
+funktioniert unabhängig von allen lokalen Workern.
 
 ## Einschalten
 
-1. Für `prism-data` ein fein abgestuftes GitHub-Token mit Zugriff nur auf dieses
-   Repository und der Berechtigung **Contents: Read-only** erstellen. Für den
-   Betrieb den Ablauf des Tokens überwachen und das Token regelmässig erneuern.
-2. Den Tokenwert in einer Datei ausserhalb des Checkouts ablegen, ohne
-   Gruppen- oder Weltzugriff. Die Datei muss für den Pipeline-Prozess (UID 1000
-   im Container) lesbar sein. Bei rootless Docker die Host-UID-Zuordnung
-   berücksichtigen. Compose bindet dateibasierte Secrets ein und übernimmt
-   deshalb die Eigentümerschaft und Rechte der Datei.
-3. In der lokalen `.env` nur den Dateipfad und die Compose-Dateien setzen.
-   Wenn bereits weitere Overlays verwendet werden, die Liste ergänzen.
+1. Fein abgestuftes GitHub-Token: nur Repository `AdBuch/prism-data`, Berechtigung
+   **Contents: Read-only**, Ablauf höchstens 90 Tage. Ablage und Rotation:
+   OPERATIONS.md, «Configuration and secrets».
+2. In `.env`:
 
    ```dotenv
    COMPOSE_FILE=docker-compose.yml:deploy/compose.prism-data.yml
    PRISM_DATA_SECRET_PATH=/absoluter/pfad/prism-data.token
    ```
 
-4. Die Images von Pipeline und Web neu bauen und starten. Nur die Pipeline
-   bekommt das Secret unter `/run/secrets/prism_data_token`.
+3. `docker compose up -d --build pipeline web`. Nur die Pipeline erhält das Secret
+   unter `/run/secrets/prism_data_token`.
 
-   ```sh
-   docker compose up -d --build pipeline web
-   docker compose logs --tail 100 pipeline
-   ```
+## Schema
 
-## Ausgabeformat und Redaktion
+Akzeptiert werden `schema_version` `1.0` und `1.1` (geprüft am realen Export vom
+25.11.2026). Pflicht: `date` (muss zum Dateinamen passen), `timezone`
+(`Europe/Zurich`), `generated_at` mit Zeitzone, `publication_status`, mindestens ein
+Artikel. Rubriken: `sections[{title, items[]}]`; Artikel: `id` (eindeutig), `title`,
+`body`, optional `lead`, `sources[{url, title, publisher, published_at, source_type,
+access}]`, `source_urls[]`, `assessments[]`, `perspectives[]`, `uncertainties[]`,
+`images[]`. Zusätzlich `deep_dive` (Magazin), `good_news`, `random_fact`,
+`outlook[]` (Lagebild/Ausblick), `lead`, `editorial_note`, `editorial_cutoff`.
+`null` in optionalen Feldern ist erlaubt und bleibt leer – fehlende URLs, Daten oder
+Bildrechte werden nie ergänzt. Grenzen: 2 MiB pro Datei, 200 Artikel, Textlängen pro Feld.
 
-Die Integration akzeptiert Schema `1.0` und `1.1` mit Datum, Zeitzone,
-`generated_at` inklusive Zeitzone und `publication_status`. Die Rubriken
-enthalten Artikel mit stabiler ID, Titel und Text. `deep_dive`, `good_news`,
-`random_fact`, `outlook`, Vorspann und redaktionelle Hinweise werden
-übernommen, sofern vorhanden. Zur Publikation `published` oder `final`
-setzen. `draft`, `unverified` und `test_import_unverified` werden für den
-Importtest gespeichert. Diese drei Zustände werden weder exportiert noch
-als Modellkontext verwendet. Unbekannte Zustände und fehlerhafte Dokumente
-werden zurückgewiesen.
+Alles wird erhalten: Datum, Erzeugungszeit, Status, Vorspann, Rubriken (Reihenfolge),
+Artikel, Originalquellen mit Verlag, Titel und Datum, Einschätzungen, Perspektiven,
+Unsicherheiten, Bildmetadaten und -rechte, Magazin, Good News, Random, Ausblick,
+redaktionelle Hinweise, Schema-Version, Redaktionsschluss. Das Originaldokument
+liegt unverändert in der Tabelle `contributions`.
 
-- **Originalquellen:** `sources` enthält URL, Titel und Verlag sowie
-  gegebenenfalls Veröffentlichungsdatum, Typ und Zugriff. `source_urls`
-  ergänzt einfache Verweise. Diese Zuordnung gilt auf Artikelebene. Sie
-  beeinflusst weder den Verifikationsstatus noch die Zahl unabhängiger
-  Belege in der bestehenden Pipeline.
-- **Perspektiven:** `assessments` und `perspectives` unterstützen Text oder
-  Objekte mit Text, Bezeichnung, Attribution und eigenen Quellen.
-  `uncertainties` bleibt am jeweiligen Artikel sichtbar.
-- **Bilder:** `images` unterstützt `url`, `source_url`, `alt`, `caption`,
-  `credit`, `license`, `license_url`, `rights`, `rights_note` und
-  `display_allowed`. Eingebettet werden HTTPS-Bilder mit Credit und
-  dokumentierter Freigabe oder erkannter offener Lizenz. Bei fehlender Freigabe
-  erscheinen nur die Rechtehinweise und der Bildquellen-Link, sofern
-  mitgeliefert. Der Browser lädt freigegebene Bilder direkt ohne Referrer.
-  Die Rechtekennzeichnung kommt vom Upstream, der seine Freigaben prüfen muss.
-- **Tagesausgabe:** Am selben Ausgabedatum ordnet der Export eindeutige Treffer
-  nach normalisiertem Titel und gemeinsamen Original-URLs zusammen. Bei hoher
-  Titelähnlichkeit ist auch ein Treffer aus unterschiedlichen Quellen möglich.
-  Zweifelhafte oder mehrdeutige Treffer bleiben eigenständig. Der bestehende
-  Artikel behält Titel, Text und Quellen. Ergänzungen erscheinen mit eigener
-  Herkunft, Unsicherheit und Quellenbindung unter «Weitere Berichterstattung».
-  Eigenständige Vertiefungen bleiben als Magazin-Stücke erhalten. Feed-Überblick,
-  bestehende Ausgaben und deren Prüfregeln bleiben verfügbar.
-- **Redaktionslauf:** Der 06:00-Uhr-Lauf kann den Vortag als Kontext verwenden.
-  Sobald das aktuelle Bulletin importiert ist, wird es beim nächsten Export in
-  die aktuelle Morgenbriefing-Ausgabe integriert. Spätere manuelle
-  Redaktionsläufe sehen die aktuellen Überschriften und Originalverweise als
-  Recherchehinweise. Zur Faktenbestätigung bleiben Originalbelege erforderlich.
+## Publikationsstatus
 
-## Betrieb und Fehler
+| `publication_status` | Wirkung |
+| --- | --- |
+| `published`, `final` | In die Tagesausgabe übernommen, gekennzeichnet als KI-kuratierte Sekundärquelle |
+| `draft`, `unverified`, `test_import_unverified` | Gespeichert (`review_required`), nicht exportiert, nicht als Modellkontext genutzt |
+| anderes | Abgewiesen (`invalid_document`) |
 
-Der Import speichert je Ausgabedatum einen Datensatz mit Inhalts-Hash und
-Erzeugungszeit. Unveränderte Dateien werden erkannt. Korrigierte Dateien
-werden neu geprüft und aktualisiert. Bei einem 404 prüft der Import separat,
-ob das Repository lesbar ist, weil GitHub fehlende private Berechtigungen
-ebenfalls mit 404 beantwortet. Tokens und Bulletin-Inhalte gelangen nicht
-ins Importlog.
-
-Ein Datum lässt sich ohne Wartezeit nachladen:
+Der Status wird nie umgeschrieben. Eine ausdrückliche Prüfung ist möglich und an den
+Inhalts-Hash gebunden – eine neue Revision braucht eine neue Freigabe:
 
 ```sh
-docker compose exec -T pipeline python3 -m prismunfold import-bulletin \
-  --date YYYY-MM-DD --site /site
+docker compose run --rm pipeline import-bulletin --date 2026-11-25 \
+  --review approved --reviewer adrian --note "Darstellungstest"
 ```
 
-Logs zeigen Wartestatus, unveränderte Inhalte, öffentliche beziehungsweise
-zurückgehaltene Ausgaben und Importfehler. Bei Berechtigungsfehlern den
-Repository-Zugriff des Tokens und die Lesbarkeit der Secret-Datei im
-Pipeline-Container prüfen. Den Tokenwert dabei nicht ausgeben.
+Freigegebene Bulletins erscheinen als «manuell freigegeben» mit dem Upstream-Status.
+`--review rejected` hält auch ein upstream veröffentlichtes Bulletin zurück.
+
+Das Testbulletin vom 25.11.2026 ist `test_import_unverified` und hat fast keine
+Originalquellen. Es dient (gekürzt) als Test-Fixture
+`tests/fixtures/prism-data/2026-11-25.json` und wird nicht veröffentlicht.
+
+## Ablauf, Revisionen, Fehler
+
+- Ab 07:00 prüft jeder Pipeline-Zyklus (10 Minuten) die heutige Datei. Fehlt sie:
+  `import_waiting`, nächster Zyklus versucht es erneut.
+- Gleicher Inhalt (SHA-256): `import_unchanged`, nichts geschieht.
+- Korrigierte Datei mit neuerem oder gleichem `generated_at`: ersetzt die gespeicherte
+  Revision; die alte bleibt als `superseded` erhalten.
+- Ältere Revision: wird als `superseded` protokolliert, ersetzt nie die neuere.
+- Ein unterbrochener Import hinterlässt nichts (eine Transaktion); der nächste Lauf
+  importiert erneut.
+- Fehler beenden nie die Pipeline. Fehlercodes im Event `import_failed`:
+  `auth_failed`, `github_unavailable`, `invalid_json`, `invalid_document`,
+  `unsupported_schema`, `too_large`, `secret_unreadable`, `invalid_date`.
+  Bestehende Ausgaben bleiben veröffentlicht.
+
+Bei 404 prüft der Import separat, ob das Repository lesbar ist, weil GitHub fehlende
+Berechtigungen ebenfalls mit 404 beantwortet (`auth_failed` statt `import_waiting`).
+
+Manuell und rückwirkend:
+
+```sh
+docker compose run --rm pipeline import-bulletin --date 2026-11-25
+docker compose run --rm pipeline import-bulletin --from 2026-11-01 --to 2026-11-25
+PYTHONPATH=src python3 -m prismunfold import-bulletin --date 2026-11-25 --file pfad/2026-11-25.json   # lokal, ohne GitHub
+```
+
+## Einbindung in die Tagesausgabe
+
+- Am selben Datum werden Bulletin-Artikel deterministisch mit vorhandener
+  Berichterstattung abgeglichen (`dedupe.py`: kanonische URLs, Titel, Entitäten,
+  ±2 Tage). Eindeutige Treffer erscheinen beim bestehenden Artikel unter «Weitere
+  Berichterstattung» mit eigener Herkunft; schon gezeigte Absätze werden nicht
+  wiederholt. Zweifelhafte Treffer bleiben eigenständig.
+- Die Quellenangaben gelten auf Artikelebene (`citation_level: item`); sie beeinflussen
+  weder Verifikationsstatus noch die Zahl unabhängiger Belege.
+- Die Vertiefung wird Magazin-Beitrag, Good News und Random eigene Rubriken.
+- Bilder werden nur mit Credit und dokumentierter Freigabe oder offener Lizenz
+  angezeigt (EDITORIAL_WORKFLOW.md, «Images»).
+- Der 06:00-Redaktionslauf erhält das Bulletin des Vortags (oder bereits heutige) als
+  Recherchehinweis – nur veröffentlichte oder freigegebene Bulletins, nie als Beleg.
+
+## Grenzen
+
+- Korrekturen des Vortags nach Mitternacht werden nicht automatisch gesucht
+  (`--date` verwenden).
+- Freigaben werden von der Kommandozeile erteilt; eine Redaktionsoberfläche ist geplant.

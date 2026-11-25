@@ -185,23 +185,25 @@ npm run typecheck && npm test
 ### What is tested
 
 Every push runs, in GitHub Actions: the pipeline tests on SQLite and PostgreSQL
-(including hostile agent reports), frontend type check and unit tests, browser tests
-on the demo build, ShellCheck, and a full stack run in which a browser reads a story
-that went through the collector container, the report check and the database.
+(hostile agent reports, prism-data import, source classification, editorial states,
+recovery, the 25 November AP-403 regression, API contract, schema migration),
+frontend type check, unit and browser tests, ShellCheck, compose validation, and a
+full stack run in which a browser reads a story that went through the collector
+container, the report check and the database. No test needs network access,
+credentials, paid AI calls or the private `prism-data` repository.
 
 The "Live feeds" workflow runs the whole chain on real feeds. It runs when the catalog
 changes or on demand, never as a gate, because it depends on the network.
 
 ### Where things are
 
-- `docs/audit.md`: what was found, what is fixed, the backlog and the open risks
-- `docs/architecture.md`: how the parts fit together
-- `collectors/README.md`: the agent images
-- `catalog/README.md`: the source catalog and how to review a source
-- `frontend/README.md`: the frontend prototype's original notes
-
-### Optional: GitHub-Morgenbriefing als zusätzliche Quelle
-
-Der Pipeline-Container kann tägliche Bulletins aus einem privaten GitHub-Repository
-in die redaktionelle Tagesausgabe integrieren. Einrichtung, Quellenrolle und
-Betrieb stehen in der [Prism-Data-Dokumentation](docs/PRISM_DATA.md).
+- `docs/PROJECT.md`: vision, the one roadmap, status (implemented / experimental / planned / deprecated)
+- `docs/architecture.md`: components, data flow, database model, trust boundaries
+- `docs/EDITORIAL_WORKFLOW.md`: contributions, states, publication policy, source checks, images
+- `docs/API.md`: the JSON API, including the unified daily edition
+- `docs/PRISM_DATA.md`: the prism-data bulletin import (German)
+- `docs/OPERATIONS.md`: deployment, secrets, scheduling, logging, recovery, rollback
+- `docs/EDITORIAL_SPEC.md`: the editorial target of the Morgenbriefing
+- `docs/BRANCH_RECONCILIATION.md`: how the branches were consolidated in 0.1
+- `docs/audit.md`: the audit of 14 November 2026 (historical)
+- `collectors/README.md`, `catalog/README.md`, `frontend/README.md`: agents, sources, frontend notes

@@ -1,3 +1,6 @@
+> **Historical record.** Audit of 14 November 2026. Status and backlog are superseded by
+> [PROJECT.md](PROJECT.md); the 0.1 branch audit is [BRANCH_RECONCILIATION.md](BRANCH_RECONCILIATION.md).
+
 # Repository audit and backlog
 
 Audit of 14 November 2026, covering the branches `main`, `mvp/phase-1`,

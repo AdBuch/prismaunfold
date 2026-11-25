@@ -1,6 +1,6 @@
 # PrismUnfold: Phase 2 MVP Frontend Prototype Brief
 
-Status: product direction and implementation handoff (9 November 2026).
+Status: product direction and implementation handoff (9 November 2026). **Planned for milestone 0.3**; the backend contract is `api/v1/daily` ([API.md](API.md)).
 
 ## Core experience
 

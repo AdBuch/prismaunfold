@@ -4,7 +4,7 @@ An image is embedded only when its rights are documented, never merely because a
 worker returned an image URL. Metadata of images that may not be shown is kept, so
 an editor can clear them later. An article without a usable image stays publishable.
 
-Canonical fields (docs/IMAGE_RIGHTS.md):
+Canonical fields (docs/EDITORIAL_WORKFLOW.md, "Images"):
 
     url, source_url, alt, caption, credit, license, license_url, rights, rights_note,
     display_allowed (upstream claim), origin, display (our decision), display_reason

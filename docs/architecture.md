@@ -1,68 +1,99 @@
 # Architecture
 
+Status words: **implemented**, **experimental**, **planned** (see [PROJECT.md](PROJECT.md)).
+
+## Data flow
+
+```text
+RSS / original publishers ──► feed desk (ingest, cluster, extract) ─────────┐
+prism-data (ChatGPT bulletin) ──► bulletin importer ──────────────────────┐ │
+Codex (/ Claude / Mistral) editorial worker ──► editorial validation ───┐ │ │
+topic collectors (codex, claude, vibe, goose) ──► report desk ────────┐ │ │ │
+                                                                      ▼ ▼ ▼ ▼
+                                                   normalised contributions + provenance
+                                                                      │
+                                               dedupe / topic matching (deterministic)
+                                                                      │
+                                source accessibility + editorial states + policy
+                                                                      │
+                                                                 PostgreSQL
+                                                                      │
+                                                          edition composition
+                                                                      │
+                           static JSON: daily edition · Morgenbriefing · stories · archive
+                                                                      │
+                                                     nginx ──► browser (TypeScript)
 ```
-publisher feeds ──► feed desk ─────────────┐
-(catalog, active only)   cluster, extract  │
-                                           ▼
-topics.txt ──► plan ──► collectors ──► report check ──► Story ──► verification ──► store
-               (who writes what)  (agents)   (untrusted input)                  (PostgreSQL)
-                    ▲                                                               │
-                    └──────────── archive: earlier stories on the topic ◄───────────┤
-                                                                                    ▼
-                                             browser ◄── web (nginx) ◄── JSON ◄── compose edition
-```
 
-## One story model
+## Components and responsibilities
 
-Everything publishable is a `Story` (`src/prismunfold/models.py`): a headline and
-sentences, each with the URLs of the sources backing it. Two producers write stories:
+| Component | Code | Responsibility | Status |
+| --- | --- | --- | --- |
+| Source ingestion | `ingest.py`, `normalize.py`, `pipeline.py`, `catalog/` | Read active feeds only, canonical URLs, robots.txt | Implemented |
+| Topic clustering | `cluster.py`, `desk.py` | Feed articles → event clusters → extractive stories | Implemented |
+| Agent report desk | `plan.py`, `reports.py`, `collectors/` | Assign topics, check untrusted agent reports, store stories | Implemented |
+| External bulletin import | `bulletin.py` | prism-data fetch, schema validation, revisions, review, backfill | Implemented |
+| AI editorial workers | `scripts/editorial.sh`, `config/editorial/` | Codex edition (single call; split stages experimental) | Implemented / experimental |
+| Normalisation & provenance | `contributions.py` | Provider-independent contribution records, states, raw documents | Implemented |
+| Deduplication | `dedupe.py` | Same-event matching without model calls; coverage attachment | Implemented |
+| Editorial validation & policy | `editorial.py` | Per-article states, publication policy, approve/reject, recovery | Implemented |
+| Evidence & source validation | `linkcheck.py`, `verification.py` | Accessibility (nine statuses, SSRF-safe); citation/support/corroboration for stories | Implemented; page-reading checker planned |
+| Image metadata & rights | `images.py` | Display decision from rights, AI labelling | Implemented |
+| Persistence | `storage.py`, `storage_pg.py` | Stores, additive schema, cross-process locks | Implemented |
+| Daily edition composition | `compose.py` (feed edition), `bulletin.merge_editions` + `daily.py` (editorial) | One logical edition per date | Implemented (API); UI in 0.3 |
+| Magazine | `magazine` items in editions, `daily.magazine` | Long-form features with provenance | Implemented in API; own model and UI in 0.3 |
+| API export | `export.py`, `editorial.export_editorial`, `daily.py` | Atomic static JSON | Implemented |
+| Frontend | `frontend/` | Renders edition, Morgenbriefing, stories, archive | Implemented; unified UI in 0.3 |
+| Scheduling | `docker/pipeline/scheduler.sh`, `deploy/systemd/`, `scripts/editorial-scheduled.sh` | Loop every 10 min; 06:00/07:00 timers | Implemented |
+| Monitoring | `oplog.py`, `run.json` | Structured JSON events | Implemented; metrics/alerts planned |
 
-- **The feed desk** (`desk.py`) turns a cluster of feed articles into a story whose
-  sentences are taken from the articles' own titles and excerpts.
-- **Collector agents** (`collectors/`) research a topic and file a JSON report, which
-  `reports.py` checks as untrusted input and turns into a story, or rejects.
+## Contributions versus published content
 
-One model means one archive, one verification path and one export.
+Every contribution is stored as received (`contributions` table, raw document, hash,
+state history). Published content is a separate, composed view:
 
-## Verification
+- `editions` row `editorial|morgenbriefing|{date}` – the published editorial edition
+  (published articles plus a `withheld` list that is never exported).
+- `editions` row `bulletin|morgenbriefing|{date}` – the current prism-data revision
+  (plus an optional operator review bound to its hash).
+- `editions` rows `daily|{date}` – the feed-desk daily edition (unchanged).
+- Export merges editorial edition, bulletin and matching agent stories into
+  `api/v1/editorial/morgenbriefing.json` and `api/v1/daily/{date}.json`.
 
-`verification.py` answers four questions separately: is there a well-formed citation,
-does the URL answer, does the page support the sentence, do two independent
-publishers support it. The result is one of `unverified`, `supported`, `disputed`,
-`review_required`, per sentence and per story. Support is decided by a
-`SupportChecker`; the only real one today is the extractive checker for feed-desk
-stories. A checker that reads the cited page is the main missing piece.
+There is no per-provider newspaper model; provider identity is provenance.
 
-## Editions
+## Database model
 
-`compose.py` builds one edition per day, the same for every reader, and freezes it
-once the day is over. Reader preferences are applied in the browser and stored only
-there (`frontend/src/lib/prefs.ts`).
+| Table | Content | Since |
+| --- | --- | --- |
+| `articles` | Feed articles (canonical URL unique) | 0.0 |
+| `stories` (+ `story_index`/tsvector) | Feed-desk and agent stories; archive search | 0.0 |
+| `editions` | Frozen feed editions, editorial editions, bulletin revisions (JSON) | 0.0 |
+| `contributions` | Every received contribution revision with provenance and state; unique per `(source_key, content_hash)` | 0.2 |
+| `schema_migrations` | Applied schema versions (1, 2) | 0.2 |
 
-## The contract between pipeline and frontend
+Migrations are additive (`CREATE … IF NOT EXISTS`) and run when a store opens; there
+is no destructive migration. Rolling back code needs no schema change.
 
-`export.py` writes static JSON under `site/api/v1/` in the shapes of
-`frontend/src/models.ts`. The frontend's `ApiContentService` fetches and shape-checks
-it. There is no application server in the read path; nginx serves files.
-
-## Containers and trust boundaries
+## Trust boundaries
 
 | Boundary | Rule |
 | --- | --- |
-| Agent to pipeline | Reports and status files are untrusted: size-limited, type-checked, never executed. The pipeline mounts them read-only |
-| Pipeline to agent | Job list and prior coverage, mounted read-only into the collectors |
-| Pipeline to web | Exported JSON, mounted read-only into nginx |
-| Pipeline to internet | Feed fetches honour robots.txt; the link check refuses private addresses |
-| Browser | Strict Content-Security-Policy; no third-party requests; all text escaped by the `html` template helper |
+| Agents / workers → pipeline | Untrusted input: size limits, type checks, never executed; reports mounted read-only |
+| Codex editorial container | Own auth volume, read-only sandbox, no database, no Docker socket, no repository credentials |
+| prism-data token | Only the pipeline container, as a Compose secret; requests only to `api.github.com`, no redirects |
+| Pipeline → internet | Feeds honour robots.txt; source checks only to public addresses, connection pinned, redirects re-validated |
+| Pipeline → web | Exported JSON, mounted read-only into nginx |
+| Browser | Strict CSP; images only from HTTPS with display rights; text escaped by the `html` helper |
 
-## Decisions and their reasons
+## Decisions
 
-- **Static JSON instead of an API server.** Reading is the hot path at scale and files
-  behind a CDN are the cheapest way to serve it. A Go API is planned for writes.
-- **Files on volumes between containers.** No queue, no Docker socket; a collector is
-  a run-to-completion job that also fits a Kubernetes CronJob.
-- **Frontend moved to `frontend/`**, so it no longer shares `src/` and `tests/` with Python.
-- **The frontend stayed framework-free TypeScript** for this step, to connect what
-  exists instead of rewriting it. The Angular port decided earlier is still open.
-- **Sources stay `pending_review` in the repository.** Activating a publisher's feed
-  is a rights decision for a person.
+- **Static JSON instead of an API server** for reading; a Go write API is planned.
+- **Files on volumes between containers**, no queue, no Docker socket.
+- **Docker Compose on one small VM**; no Kubernetes/Kafka/Elasticsearch until a
+  requirement is demonstrated.
+- **Deterministic matching** before any model call; **granular states** instead of
+  all-or-nothing validation; **idempotent, lock-protected publication**.
+- **Frontend stays framework-free TypeScript** until 0.3; the Angular port is decided
+  but not started.
+- **Sources stay `pending_review`** in the repository; activation is a person's rights decision.
