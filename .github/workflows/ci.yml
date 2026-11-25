@@ -41,7 +41,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      - name: Unit tests (SQLite, standard library only)
+      - name: Syntax of every module and script (no third-party packages needed)
+        run: |
+          python -m compileall -q src tests
+          for f in scripts/*.sh; do bash -n "$f"; done
+      - name: Unit, contract, migration and regression tests (SQLite, standard library only)
+        # No network, no credentials, no AI calls, no access to prism-data: fixtures and mocks only.
         run: PYTHONPATH=src python -m unittest discover -s tests -v
       - name: Install PostgreSQL driver
         run: pip install "psycopg[binary]>=3.2,<4"
@@ -98,11 +103,16 @@ jobs:
             collectors/common/collect.sh collectors/common/worker.sh \
             collectors/run-edition.sh docker/pipeline/scheduler.sh \
             tests/fixtures/fake-agent/claude
+      - name: ShellCheck (bash operator scripts, errors only)
+        run: shellcheck --shell=bash --severity=error scripts/*.sh
+
       - name: Compose files are valid
         run: |
           cp .env.example .env
           cp collectors/.env.example collectors/.env
           docker compose config --quiet
+          # The prism-data overlay (secret file only for the pipeline).
+          PRISM_DATA_SECRET_PATH=/dev/null docker compose -f docker-compose.yml -f deploy/compose.prism-data.yml config --quiet
           TOPIC=ci docker compose -f collectors/docker-compose.yml config --quiet
       - name: No source is active without a review
         run: |
