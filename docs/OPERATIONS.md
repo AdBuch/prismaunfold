@@ -62,25 +62,9 @@ event, then revoke the old token on GitHub.
 
 ## Deploy
 
-```bash
-cd /opt/unfold
-# 0. Backup (always)
-mkdir -p ~/backups && docker compose exec -T db pg_dump -U prismunfold -Fc prismunfold > ~/backups/prismunfold-$(date +%F-%H%M).dump
-git rev-parse HEAD > ~/backups/deployed-before-$(date +%F-%H%M).txt
-# 1. Code (normal deploying user, umask 022; or the existing update script)
-git fetch origin
-git switch feature/consolidation-0.1-0.2   # after the PR is merged: git switch main && git pull --ff-only
-# 2. Images and services (the schema upgrade is additive and runs on pipeline start)
-docker compose build pipeline web
-docker compose up -d db pipeline web
-# 3. Checks
-docker compose logs --tail 50 pipeline
-docker compose run --rm --no-deps -T --entrypoint python3 pipeline -c \
-  'from prismunfold.storage import open_store; import os; s=open_store(os.environ["DATABASE_URL"]); print("schema", s.schema_version())'
-curl -fsS http://localhost:8080/api/v1/daily/index.json | head -c 300
-# 4. Timers (only when the files under deploy/systemd changed)
-sudo bash scripts/install-editorial-timers.sh
-```
+Production runs only verified releases: `unfold-update [vX.Y.Z]`. Gate, backup,
+checks and automatic rollback are described in [RELEASE.md](RELEASE.md), including
+the exact commands for the first deployment of v0.2.0.
 
 ## Scheduling
 
@@ -184,19 +168,6 @@ docker compose run --rm pipeline import-bulletin --date 2026-11-25 --review appr
 
 ## Rollback
 
-The 0.2 schema change is additive; code from `integration/mvp` ignores the new
-tables, so rolling back code needs no database change.
-
-```bash
-cd /opt/unfold
-git switch integration/mvp          # or: git checkout "$(cat ~/backups/deployed-before-….txt)"
-docker compose build pipeline web && docker compose up -d pipeline web
-# old publication scripts stop the pipeline container during publish again; that is expected
-# only if data must be restored:
-docker compose stop pipeline
-docker compose exec -T db pg_restore -U prismunfold -d prismunfold --clean --if-exists < ~/backups/prismunfold-….dump
-docker compose start pipeline
-```
-
-Editions published by 0.2 carry extra fields; the old frontend ignores them. Items
-withheld by 0.2 stay withheld after a rollback (they are not in the exported JSON).
+`unfold-update rollback` returns to the previous deployment (code and images); the
+database stays (additive schema). Database restore and manual fallback:
+[RELEASE.md](RELEASE.md#rollback).

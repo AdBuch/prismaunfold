@@ -44,7 +44,7 @@ jobs:
       - name: Syntax of every module and script (no third-party packages needed)
         run: |
           python -m compileall -q src tests
-          for f in scripts/*.sh; do bash -n "$f"; done
+          for f in scripts/*.sh deploy/unfold-update; do bash -n "$f"; done
       - name: Unit, contract, migration and regression tests (SQLite, standard library only)
         # No network, no credentials, no AI calls, no access to prism-data: fixtures and mocks only.
         run: PYTHONPATH=src python -m unittest discover -s tests -v
@@ -104,7 +104,7 @@ jobs:
             collectors/run-edition.sh docker/pipeline/scheduler.sh \
             tests/fixtures/fake-agent/claude
       - name: ShellCheck (bash operator scripts, errors only)
-        run: shellcheck --shell=bash --severity=error scripts/*.sh
+        run: shellcheck --shell=bash --severity=error scripts/*.sh deploy/unfold-update
 
       - name: Compose files are valid
         run: |
