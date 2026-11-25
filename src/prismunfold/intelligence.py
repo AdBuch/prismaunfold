@@ -292,7 +292,9 @@ class EditorialIntelligence:
                 claim_status[key] = "disputed_with_disclosure"
             else:
                 claim_status[key] = "human_reviewed_evidence_links"
-        content = {**draft, "claim_status": claim_status, "publication_status": "approved",
+        content = {**draft, "claim_status": claim_status,
+                   "reviewed_dossier_digest": digest(dossier),
+                   "publication_status": "approved",
                    "approval": {"basis": "named_human_review", "reviewer": reviewer,
                                 "checked_claim_sources": checked_claim_sources,
                                 "approved_at": timestamp(utcnow())}}
@@ -316,8 +318,14 @@ class EditorialIntelligence:
         # Do not expose internal dossier text or reviewer identifiers to the reader.
         public = []
         for article in articles:
+            # New evidence requires renewed review. Previously published editions
+            # stay untouched; the current pool withholds outdated approval.
+            current_dossier = self.dossier(article["event_id"])
+            if article.get("reviewed_dossier_digest") != digest(current_dossier):
+                continue
             filtered = {k: v for k, v in article.items()
-                        if k not in ("approval", "content_digest", "source_document_ids")}
+                        if k not in ("approval", "content_digest", "source_document_ids",
+                                     "reviewed_dossier_digest")}
             filtered["review"] = {"status": "human_approved", "basis": "claim_evidence_review"}
             checked_ids = {doc_id for ids in
                            article["approval"]["checked_claim_sources"].values()
@@ -326,7 +334,7 @@ class EditorialIntelligence:
                 {"document_id": doc["document_id"], "url": doc["url"],
                  "source_id": doc["source_id"], "language": doc["language"],
                  "source_type": doc["source_type"], "original_work_id": doc["original_work_id"]}
-                for doc in self.dossier(article["event_id"])["documents"]
+                for doc in current_dossier["documents"]
                 if doc["document_id"] in checked_ids
             ]
             public.append(filtered)
