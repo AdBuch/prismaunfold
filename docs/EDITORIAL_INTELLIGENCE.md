@@ -94,7 +94,7 @@ The static, atomic preview path is:
 
     api/v1/editorial-intelligence/content-pool.json
 
-The versioned schema is prismunfold.content-pool/1. It contains only approved articles with event_id, article_id, language, article_variant, headline, lead, paragraphs with claim_keys, claim_references, topics, regions, revision, review status, and reviewer-checked original source references. Internal dossiers and reviewer identity are not exported.
+The versioned schema is prismunfold.content-pool/1. It contains only approved articles with event_id, article_id, language, article_variant, headline, lead, paragraphs with claim_keys, claim_references, topics, regions, revision, review status, and reviewer-checked original source references. Internal dossiers and reviewer identity are not exported. If new source evidence enters a dossier, its existing approval fingerprint becomes stale and the current content pool withholds that article until a new human review. Previously frozen daily editions are not overwritten.
 
 Milestone 0.3 should add a versioned adapter into the canonical article/edition contract when the teams agree on mapping, corrections and publication gate semantics. This new endpoint is a shared content pool only, never a second newspaper. Existing daily JSON endpoints and old frontend remain unchanged. Reader preferences select prepared content by topic, language and reading depth without additional model calls; a minimum public-interest coverage policy is still future work.
 
