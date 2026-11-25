@@ -67,7 +67,7 @@ Dossiers remain internal and explicitly identify coverage gaps and contradictory
 
 ## Durable jobs and database schema
 
-The module reuses the existing SQLite/PostgreSQL connections and advisory locks. On first explicit EI use it creates an additive ei_records table with id, kind, event_id, updated_at and data (JSON text), plus an index. It marks optional schema migration 3. It does not alter the original tables.
+The module reuses the existing SQLite/PostgreSQL connections and advisory locks. On first explicit EI use it creates an additive ei_records table with id, kind, event_id, updated_at and data (JSON text), plus an index. Its isolated ei_schema_migrations ledger starts at EI version 1. The live 0.1/0.2 schema_migrations ledger remains at core version 2 for compatibility. It does not alter the original tables.
 
 Record prefixes: document, dossier, job, draft, published and revision. Jobs have immutable IDs per gap set, bounded lease expiry, retry count and dead-letter state. Stale results from replaced worker leases are rejected; failures persist for retry. No large external queue, Kafka or Kubernetes is added.
 
