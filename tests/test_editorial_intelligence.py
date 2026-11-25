@@ -186,6 +186,22 @@ class EditorialIntelligenceTests(unittest.TestCase):
         evidence = self.ei.dossier(self.event_id)["claims"][0]["evidence"]
         self.assertIn("contradicts", [e["relation"] for e in evidence])
         self.assertEqual(self.ei.content_pool()["articles"], [])
+        self.ei.draft(self.event_id, "de", writer)
+        supportive_id = validate_document(self.docs[0])["document_id"]
+        contrary_id = validate_document(contradicted)["document_id"]
+        with self.assertRaisesRegex(ValueError, "disputed claims"):
+            self.ei.approve(self.event_id, "de", reviewer="Editor",
+                            checked_claim_sources={"vote": [supportive_id]})
+        def with_disclosure(dossier, language):
+            article = writer(dossier, language)
+            article["uncertainties"] = ["Eine weitere Quelle widerspricht dieser Darstellung."]
+            return article
+        self.ei.draft(self.event_id, "de", with_disclosure)
+        published = self.ei.approve(
+            self.event_id, "de", reviewer="Editor",
+            checked_claim_sources={"vote": [supportive_id, contrary_id]})
+        self.assertEqual(published["claim_status"]["vote"], "disputed_with_disclosure")
+        self.assertEqual(len(self.ei.content_pool()["articles"][0]["source_references"]), 2)
         secondary = document("secondary", "en", "ai-bulletin")
         secondary["origin_type"] = "ai_secondary"
         self.ei.ingest([secondary])
