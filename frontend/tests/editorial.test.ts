@@ -41,3 +41,22 @@ test('a bulletin without a magazine still renders', async (t) => {
   }]));
   assert.match((await editorialView()).body.value, /Sekundärquelle/);
 });
+
+test('review-required and restricted sources stay visibly labelled (0.2 states)', async (t) => {
+  const article = {
+    article_id: 'ed-2026-11-25-1', state: 'published', review_required: true,
+    approval: { by: 'Adrian', at: '2026-11-25T08:00:00Z', note: '' },
+    headline: 'Netz unter Druck', section: 'Krisen- und Konfliktgebiete', lead: 'Vorspann',
+    paragraphs: [{ text: 'Absatz', source_ids: ['ap'], evidence: 'restricted', review_required: true }],
+    sources: [{ id: 'ap', url: 'https://apnews.com/x', title: 'AP', publisher: 'AP News', access: 'open', link_status: 'restricted' }],
+  };
+  t.mock.method(globalThis, 'fetch', async () => Response.json([{
+    date: '2026-11-25', articles: [article], magazine: null, warnings: ['Magazin zurückgestellt oder nicht vorhanden'],
+    disclosure: 'KI', completeness: 'partial', random: { text: 'Fakt', sources: [], review_required: true },
+  }]));
+  const page = (await editorialView()).body.value;
+  assert.match(page, /Prüfbedürftig/);
+  assert.match(page, /Link nicht verifiziert \(restricted\)/);
+  assert.match(page, /Magazin noch in redaktioneller Prüfung/);
+  assert.match(page, /Quellenzugriff unvollständig/);
+});
