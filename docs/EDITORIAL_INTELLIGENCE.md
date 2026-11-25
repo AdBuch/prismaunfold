@@ -82,11 +82,11 @@ The commands below require permission-reviewed local JSON files. They do not per
     python -m prismunfold.ei_cli --db /tmp/ei.sqlite jobs
     python -m prismunfold.ei_cli --db /tmp/ei.sqlite run-research --job research-... --file research.json
     python -m prismunfold.ei_cli --db /tmp/ei.sqlite draft --event evt-... --language de --file writer.de.json
-    python -m prismunfold.ei_cli --db /tmp/ei.sqlite approve --event evt-... --language de --reviewer "Named Editor" --checked-file checked.json
+    python -m prismunfold.ei_cli --db /tmp/ei.sqlite approve --event evt-... --language de --reviewer "Named Editor" --draft-digest DIGEST_FROM_DRAFT --checked-file checked.json
     python -m prismunfold.ei_cli --db /tmp/ei.sqlite export --site /tmp/ei-preview
     python -m prismunfold.ei_cli --db /tmp/ei.sqlite edition --profile profile.json
 
-Writer JSON contains headline, lead, paragraphs[]; each paragraph has text and an array of claim_keys present in the dossier. The checked JSON object maps all used claim keys to arrays of original source document IDs whose passage locators a named human editor actually inspected. Approval includes the exact language variant. The CLI does NOT authenticate the entered reviewer name, so this is not yet a production-ready review service.
+Writer JSON contains headline, lead, paragraphs[]; each paragraph has text and an array of claim_keys present in the dossier. The checked JSON object maps all used claim keys to arrays of original source document IDs whose passage locators a named human editor actually inspected. The editor must also supply the exact draft_digest returned by the draft command; the system rejects approval when the draft has since changed. Approval includes the exact language variant. The CLI does NOT authenticate the entered reviewer name, so this is not yet a production-ready review service.
 
 ## Output and 0.3 integration
 
