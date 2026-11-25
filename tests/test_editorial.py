@@ -252,6 +252,24 @@ class RecoveryTests(unittest.TestCase):
         self.assertNotIn("invalid", view)
 
 
+class ResearchStageTests(unittest.TestCase):
+    def test_research_keeps_only_citable_notes(self):
+        from prismunfold.editorial import prepare_research
+        sections = ["Schweiz Politik", "Schweiz Regional", "Peru Politik", "International", "Reisen", "Good News"]
+        raw = {"sources": [{"id": "a", "url": "https://www.admin.ch/a", "title": "A", "publisher": "Bund"},
+                           {"id": "b", "url": "https://www.un.org/b", "title": "B", "publisher": "UN"},
+                           {"id": "p", "url": "https://apnews.com/x", "title": "P", "publisher": "AP"}],
+               "dossiers": [{"section": s, "subject": s, "notes": [{"text": "Befund", "source_ids": ["a"]},
+                                                                    {"text": "Nur AP", "source_ids": ["p"]}]} for s in sections]
+                           + [{"section": "Magazin", "subject": "M", "notes": [{"text": "x", "source_ids": ["a", "b"]}]}]}
+        result = prepare_research(raw, ap_probe, excluded=set())
+        self.assertEqual({s["id"] for s in result["sources"]}, {"a", "b"})
+        self.assertTrue(all(len(d["notes"]) == 1 for d in result["dossiers"] if d["section"] != "Magazin"))
+        raw["dossiers"] = raw["dossiers"][:3]
+        with self.assertRaisesRegex(ValueError, "six sourced"):
+            prepare_research(raw, ap_probe, excluded=set())
+
+
 class EditorialCliTests(unittest.TestCase):
     def test_validate_and_inspect_need_no_database_or_ai(self):
         import subprocess, sys

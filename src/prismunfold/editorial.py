@@ -268,6 +268,56 @@ def validate(raw, probe=http_status, excluded=None):
     return payload
 
 
+def prepare_research(raw, probe=http_status, excluded=None) -> dict:
+    """Research stage (experimental split mode): keep only evidence the writer can cite.
+
+    Ported from fix/editorial-quality. A saved, filtered dossier lets a failed writing
+    stage be retried without repeating the (expensive) research stage.
+    """
+    excluded = excluded_domains() if excluded is None else excluded
+    require(isinstance(raw, dict), "Invalid research")
+    sources = raw.get("sources")
+    require(isinstance(sources, list) and 2 <= len(sources) <= 80, "Invalid sources")
+    source_map = {}
+    for item in sources:
+        require(isinstance(item, dict), "Invalid source")
+        sid, url = string(item.get("id"), 60), public_url(item.get("url"))
+        if url is None or sid in source_map:
+            continue
+        host = urlsplit(url).hostname or ""
+        if any(host == d or host.endswith("." + d) for d in excluded):
+            continue
+        source_map[sid] = dict(id=sid, url=url, title=string(item.get("title"), 300),
+                               publisher=string(item.get("publisher"), 120), access="unknown")
+    status = {}
+    for sid, source in source_map.items():
+        value = probe(source["url"])
+        value = (REACHABLE if value else MISSING) if isinstance(value, bool) else LEGACY.get(value, value)
+        status[sid] = value
+        source["link_status"] = value
+    dossiers = raw.get("dossiers")
+    require(isinstance(dossiers, list) and len(dossiers) <= 30, "Invalid dossiers")
+    kept, used = [], set()
+    for dossier in dossiers:
+        if not isinstance(dossier, dict) or not isinstance(dossier.get("notes"), list):
+            continue
+        usable = []
+        for note in dossier["notes"][:30]:
+            ids = note.get("source_ids") if isinstance(note, dict) else None
+            if not isinstance(ids, list) or not ids or not all(isinstance(s, str) and s in source_map for s in ids):
+                continue
+            if any(status[s] == REACHABLE for s in ids):
+                usable.append(dict(text=string(note.get("text"), 1800), source_ids=ids))
+                used.update(ids)
+        if usable:
+            kept.append(dict(section=string(dossier.get("section"), 80), subject=string(dossier.get("subject"), 200),
+                             notes=usable))
+    require(sum(d["section"] in SECTIONS for d in kept) >= 6, "Research needs six sourced news dossiers")
+    require(any(d["section"] == "Magazin" and len({s for n in d["notes"] for s in n["source_ids"]}) >= 2 for d in kept),
+            "Magazine research needs two reachable documents")
+    return dict(sources=[source_map[s] for s in sorted(used)], dossiers=kept)
+
+
 def _warnings(payload) -> list[str]:
     out = []
     for item in payload.get("invalid", []):
@@ -530,6 +580,7 @@ def main(argv=None):
     p = sub.add_parser("revalidate", help="re-check the stored raw edition's sources; no AI call")
     p.add_argument("date")
     p = sub.add_parser("select-candidate"); p.add_argument("date"); p.add_argument("base")
+    sub.add_parser("research", help="filter a research dossier on stdin (experimental split mode)")
     sub.add_parser("export")
     p = sub.add_parser("status"); p.add_argument("date")
     args = parser.parse_args(argv)
@@ -539,6 +590,11 @@ def main(argv=None):
         if not chosen:
             return 1
         print(chosen)
+        return 0
+    if args.mode == "research":
+        cache, probe = _probe()
+        print(json.dumps(prepare_research(_read_stdin(), probe), ensure_ascii=False))
+        cache.save()
         return 0
     if args.mode in ("validate", "inspect"):
         raw = _read_stdin()
