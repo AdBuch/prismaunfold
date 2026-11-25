@@ -1,0 +1,217 @@
+{
+  "schema_version": "1.1",
+  "date": "2026-11-25",
+  "timezone": "Europe/Zurich",
+  "generated_at": "2026-11-25T06:01:50.901261Z",
+  "editorial_cutoff": null,
+  "publication_status": "test_import_unverified",
+  "lead": "Gekürzter Fixture-Vorspann.",
+  "sections": [
+    {
+      "title": "Schweiz Politik",
+      "items": [
+        {
+          "id": "2026-11-25-1",
+          "title": "Fixture-Meldung 2026-11-25-1",
+          "body": "Gekürzter Fixture-Text 2026-11-25-1.\n\nZweiter Absatz ohne Originalinhalt.",
+          "source_urls": [],
+          "sources": [],
+          "assessments": [],
+          "images": [],
+          "uncertainties": [
+            "Historischer Export: interne Quellenreferenzen nicht als URLs verfügbar; keine erneute Faktenprüfung."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Schweiz Gesellschaft",
+      "items": [
+        {
+          "id": "2026-11-25-2",
+          "title": "Fixture-Meldung 2026-11-25-2",
+          "body": "Gekürzter Fixture-Text 2026-11-25-2.\n\nZweiter Absatz ohne Originalinhalt.",
+          "source_urls": [],
+          "sources": [],
+          "assessments": [],
+          "images": [],
+          "uncertainties": [
+            "Historischer Export: interne Quellenreferenzen nicht als URLs verfügbar; keine erneute Faktenprüfung."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Schweiz Regional",
+      "items": [
+        {
+          "id": "2026-11-25-3",
+          "title": "Fixture-Meldung 2026-11-25-3",
+          "body": "Gekürzter Fixture-Text 2026-11-25-3.\n\nZweiter Absatz ohne Originalinhalt.",
+          "source_urls": [],
+          "sources": [],
+          "assessments": [],
+          "images": [],
+          "uncertainties": [
+            "Historischer Export: interne Quellenreferenzen nicht als URLs verfügbar; keine erneute Faktenprüfung."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Peru Politik",
+      "items": [
+        {
+          "id": "2026-11-25-4",
+          "title": "Fixture-Meldung 2026-11-25-4",
+          "body": "Gekürzter Fixture-Text 2026-11-25-4.\n\nZweiter Absatz ohne Originalinhalt.",
+          "source_urls": [],
+          "sources": [],
+          "assessments": [],
+          "images": [],
+          "uncertainties": [
+            "Historischer Export: interne Quellenreferenzen nicht als URLs verfügbar; keine erneute Faktenprüfung."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Peru Gesellschaft",
+      "items": [
+        {
+          "id": "2026-11-25-5",
+          "title": "Fixture-Meldung 2026-11-25-5",
+          "body": "Gekürzter Fixture-Text 2026-11-25-5.\n\nZweiter Absatz ohne Originalinhalt.",
+          "source_urls": [],
+          "sources": [],
+          "assessments": [],
+          "images": [],
+          "uncertainties": [
+            "Historischer Export: interne Quellenreferenzen nicht als URLs verfügbar; keine erneute Faktenprüfung."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Krisen- und Konfliktgebiete",
+      "items": [
+        {
+          "id": "2026-11-25-6",
+          "title": "Fixture-Meldung 2026-11-25-6",
+          "body": "Gekürzter Fixture-Text 2026-11-25-6.\n\nZweiter Absatz ohne Originalinhalt.",
+          "source_urls": [],
+          "sources": [],
+          "assessments": [],
+          "images": [],
+          "uncertainties": [
+            "Historischer Export: interne Quellenreferenzen nicht als URLs verfügbar; keine erneute Faktenprüfung."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Reisen",
+      "items": [
+        {
+          "id": "2026-11-25-7",
+          "title": "Fixture-Meldung 2026-11-25-7",
+          "body": "Gekürzter Fixture-Text 2026-11-25-7.\n\nZweiter Absatz ohne Originalinhalt.",
+          "source_urls": [],
+          "sources": [],
+          "assessments": [],
+          "images": [],
+          "uncertainties": [
+            "Historischer Export: interne Quellenreferenzen nicht als URLs verfügbar; keine erneute Faktenprüfung."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "International",
+      "items": [
+        {
+          "id": "2026-11-25-8",
+          "title": "Fixture-Meldung 2026-11-25-8",
+          "body": "Gekürzter Fixture-Text 2026-11-25-8.\n\nZweiter Absatz ohne Originalinhalt.",
+          "source_urls": [],
+          "sources": [],
+          "assessments": [],
+          "images": [],
+          "uncertainties": [
+            "Historischer Export: interne Quellenreferenzen nicht als URLs verfügbar; keine erneute Faktenprüfung."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Wirtschaft, Technologie & Wissenschaft",
+      "items": [
+        {
+          "id": "2026-11-25-9",
+          "title": "Fixture-Meldung 2026-11-25-9",
+          "body": "Gekürzter Fixture-Text 2026-11-25-9.\n\nZweiter Absatz ohne Originalinhalt.",
+          "source_urls": [],
+          "sources": [],
+          "assessments": [],
+          "images": [],
+          "uncertainties": [
+            "Historischer Export: interne Quellenreferenzen nicht als URLs verfügbar; keine erneute Faktenprüfung."
+          ]
+        }
+      ]
+    }
+  ],
+  "deep_dive": {
+    "id": "2026-11-25-10",
+    "title": "Fixture-Vertiefung zu Rohstoffen",
+    "body": "Gekürzter Fixture-Text deep_dive.\n\nZweiter Absatz.",
+    "source_urls": [
+      "https://eur-lex.europa.eu/eli/reg/2024/1252/oj"
+    ],
+    "sources": [
+      {
+        "url": "https://eur-lex.europa.eu/eli/reg/2024/1252/oj",
+        "publisher": "EUR-Lex",
+        "title": "Verordnung (EU) 2024/1252",
+        "published_at": null,
+        "source_type": "primary"
+      }
+    ],
+    "assessments": [],
+    "images": [],
+    "uncertainties": [
+      "Historischer Export: interne Quellenreferenzen nicht als URLs verfügbar; keine erneute Faktenprüfung."
+    ]
+  },
+  "good_news": {
+    "id": "2026-11-25-11",
+    "title": "Good News",
+    "body": "Gekürzter Fixture-Text good_news.\n\nZweiter Absatz.",
+    "source_urls": [],
+    "sources": [],
+    "assessments": [],
+    "images": [],
+    "uncertainties": [
+      "Historischer Export: interne Quellenreferenzen nicht als URLs verfügbar; keine erneute Faktenprüfung."
+    ]
+  },
+  "random_fact": {
+    "id": "2026-11-25-12",
+    "title": "Random des Tages",
+    "body": "Gekürzter Fixture-Text random_fact.\n\nZweiter Absatz.",
+    "source_urls": [],
+    "sources": [],
+    "assessments": [],
+    "images": [],
+    "uncertainties": [
+      "Historischer Export: interne Quellenreferenzen nicht als URLs verfügbar; keine erneute Faktenprüfung."
+    ]
+  },
+  "outlook": [
+    "**Wirklich wichtig:** Fixture.",
+    "**Überschätzt:** Fixture.",
+    "**Unterbeachtet:** Fixture.",
+    "**Weiter beobachten:** Fixture."
+  ],
+  "editorial_note": "Testexport der tatsächlichen Morgenausgabe. Quellenreferenzen und Bildmetadaten sind bis auf EUR-Lex nicht auflösbar; keine erfundenen URLs. Nicht zur ungeprüften Veröffentlichung. Persönliche Reiseplanung entfernt."
+}

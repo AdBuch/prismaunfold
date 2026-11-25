@@ -5,6 +5,7 @@
     prismunfold plan     write the job list and prior coverage for the collector containers
     prismunfold reports  check the collector agents' reports, store, index and export them
     prismunfold status   summarise how the collectors' jobs went
+    prismunfold import-bulletin   import the prism-data morning bulletin (see docs/PRISM_DATA.md)
 """
 
 from __future__ import annotations
@@ -163,20 +164,41 @@ def _reports(args: argparse.Namespace, cfg: dict) -> int:
 
 
 def _import_bulletin(args: argparse.Namespace, cfg: dict) -> int:
-    import logging
-    from .bulletin import import_daily
+    """Import prism-data bulletins. Never fatal for the pipeline: errors return 1 and are logged."""
+    from .bulletin import BulletinError, import_day, import_document, import_range, review_bulletin
     from .editorial import export_editorial
+    from .oplog import setup
 
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    setup()
     store = _open(args, cfg)
+    site = args.site or cfg["site_dir"]
     try:
-        changed = import_daily(store, args.secret_file, _parse_now(args.now), args.date)
-        if changed or args.date:
-            export_editorial(store, args.site or cfg["site_dir"])
+        if args.review:
+            review_bulletin(store, args.date, args.review, args.reviewer or "", args.note or "")
+            export_editorial(store, site)
+            return 0
+        if args.file:
+            with store.lock("edition-publication"):
+                outcome = import_document(store, args.date, Path(args.file).read_bytes())
+            print(f"prism-data {args.date}: {outcome}")
+            export_editorial(store, site)
+            return 0
+        if args.date_from:
+            results = import_range(store, args.secret_file, args.date_from, args.date_to or args.date_from)
+            for day, outcome in results.items():
+                print(f"prism-data {day}: {outcome}")
+            export_editorial(store, site)
+            return 1 if any(v.startswith("failed") for v in results.values()) else 0
+        outcome = import_day(store, args.secret_file, _parse_now(args.now), args.date)
+        if outcome == "imported" or args.date:
+            export_editorial(store, site)
+    except BulletinError:
+        return 1  # already logged as import_failed with its error_code
     except (ValueError, OSError) as error:
-        # Configuration/network errors are redacted by the importer. JSON errors
-        # carry offsets, never the submitted text or the access token.
-        logging.error("prism-data import failed (%s): %s", type(error).__name__, error)
+        # Never print document content or the token; the importer redacts its own errors.
+        from .oplog import event
+
+        event("bulletin", "import_failed", level=40, error_code=type(error).__name__, reason=str(error)[:300])
         return 1
     finally:
         store.close()
@@ -227,10 +249,21 @@ def main(argv: list[str] | None = None) -> int:
 
     bulletin_cmd = sub.add_parser("import-bulletin", parents=[common], help="import a private GitHub morning bulletin")
     bulletin_cmd.add_argument("--secret-file", default=os.environ.get("PRISM_DATA_TOKEN_FILE", "/run/secrets/prism_data_token"))
-    bulletin_cmd.add_argument("--date", help="explicit YYYY-MM-DD backfill")
+    bulletin_cmd.add_argument("--date", help="import this YYYY-MM-DD now (manual import)")
+    bulletin_cmd.add_argument("--from", dest="date_from", help="backfill from YYYY-MM-DD ...")
+    bulletin_cmd.add_argument("--to", dest="date_to", help="... to YYYY-MM-DD (inclusive)")
+    bulletin_cmd.add_argument("--file", help="import a local bulletin file for --date (no GitHub access)")
+    bulletin_cmd.add_argument("--review", choices=["approved", "rejected"],
+                              help="record an operator decision on the stored revision of --date")
+    bulletin_cmd.add_argument("--reviewer", help="name of the reviewing person (with --review)")
+    bulletin_cmd.add_argument("--note", help="review note (with --review)")
     bulletin_cmd.add_argument("--now", help="override the clock for testing")
 
     args = parser.parse_args(argv)
+    if args.command == "import-bulletin" and (args.file or args.review) and not args.date:
+        parser.error("--file and --review need --date")
+    if args.command == "import-bulletin" and args.review and not args.reviewer:
+        parser.error("--review needs --reviewer")
     cfg = load_config(args.config)
     return {"run": _run, "context": _context, "plan": _plan, "status": _status, "reports": _reports,
             "import-bulletin": _import_bulletin}[args.command](args, cfg)

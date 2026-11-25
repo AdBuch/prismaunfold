@@ -1,5 +1,9 @@
 #!/bin/sh
 # Pipeline loop. Every PIPELINE_INTERVAL seconds:
+#   0. import-bulletin  (only with PRISM_DATA_TOKEN_FILE) fetch today's prism-data bulletin
+#               from 07:00 Europe/Zurich; before that it is a no-op, a missing file is
+#               retried next cycle, an unchanged file is skipped by content hash and a
+#               corrected file replaces the stored revision. Failures never stop the loop.
 #   1. plan     write the job list and prior coverage for the current 6-hour edition
 #   2. reports  check what the collectors wrote for this and the previous edition
 #               (a report may arrive after the edition changed), store, index, export
@@ -26,7 +30,7 @@ LINK_FLAG="--check-links"
 while :; do
   echo "pipeline: cycle start $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   if [ -n "${PRISM_DATA_TOKEN_FILE:-}" ]; then
-    cli import-bulletin || echo "pipeline: bulletin import failed; continuing" >&2
+    cli import-bulletin || echo "pipeline: bulletin import failed (see import_failed event); continuing" >&2
   fi
   cli plan --topics "${TOPICS_FILE:-/app/config/topics.txt}" --shared-dir /shared --reports-dir /out \
     || echo "pipeline: plan failed" >&2
