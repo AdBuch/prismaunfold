@@ -38,15 +38,23 @@ class IntelligenceStore:
         self.store.db.execute(
             "CREATE INDEX IF NOT EXISTS ei_records_kind_event ON ei_records (kind, event_id)"
         )
+        # Isolated, versioned opt-in schema: the live 0.1/0.2 migration
+        # ledger must remain at version 2 until an integration release.
+        self.store.db.execute(
+            """CREATE TABLE IF NOT EXISTS ei_schema_migrations (
+                version INTEGER PRIMARY KEY,
+                applied_at TEXT NOT NULL
+            )"""
+        )
         if self.pg:
             self.store.db.execute(
-                "INSERT INTO schema_migrations (version, applied_at) VALUES (3, now()) "
-                "ON CONFLICT DO NOTHING"
+                "INSERT INTO ei_schema_migrations (version, applied_at) VALUES (1, %s) "
+                "ON CONFLICT DO NOTHING", (timestamp(utcnow()),)
             )
         else:
             self.store.db.execute(
-                "INSERT OR IGNORE INTO schema_migrations (version, applied_at) "
-                "VALUES (3, datetime('now'))"
+                "INSERT OR IGNORE INTO ei_schema_migrations (version, applied_at) "
+                "VALUES (1, ?)", (timestamp(utcnow()),)
             )
         self.store.commit()
 
