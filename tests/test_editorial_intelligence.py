@@ -231,7 +231,8 @@ class PostgresEditorialIntelligenceTests(unittest.TestCase):
             doc = document("pg-fixture", "de", "pg-work-" + uuid4().hex,
                            event_key="ei-pg-test-" + uuid4().hex)
             event_id = ei.ingest([doc])[0]
-            self.assertGreaterEqual(store.schema_version(), 3)
+            self.assertEqual(store.schema_version(), 2)
+            self.assertEqual(store.db.execute("SELECT MAX(version) FROM ei_schema_migrations").fetchone()[0], 1)
             self.assertEqual(ei.dossier(event_id)["independent_original_works"], 1)
             job = ei.plan_research(event_id)
             leased = ei.repo.lease(job["id"], worker="pg-test")
