@@ -104,6 +104,20 @@ class PostgresStore:
             (edition_id, language, built_at, Jsonb(payload)),
         )
 
+    def get_edition(self, edition_id: str) -> dict | None:
+        row = self.db.execute("SELECT data FROM editions WHERE id = %s", (edition_id,)).fetchone()
+        return row[0] if row else None
+
+    def save_edition_revision(self, edition_id: str, language: str, revised_at: datetime, payload: dict) -> bool:
+        result = self.db.execute(
+            "INSERT INTO editions (id, language, built_at, data) VALUES (%s, %s, %s, %s) "
+            "ON CONFLICT (id) DO UPDATE SET language = EXCLUDED.language, "
+            "built_at = EXCLUDED.built_at, data = EXCLUDED.data "
+            "WHERE EXCLUDED.built_at >= editions.built_at AND EXCLUDED.data <> editions.data",
+            (edition_id, language, revised_at, Jsonb(payload)),
+        )
+        return result.rowcount == 1
+
     # --- Stories written by collector agents, plus the archive index over them ---
 
     def save_story(self, story: Story) -> None:

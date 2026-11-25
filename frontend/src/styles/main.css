@@ -430,3 +430,9 @@ a:hover .figure__frame .art { transform: scale(1.03); }
 .editorial-background { background:var(--paper-2); padding:clamp(1rem,4vw,2rem); }
 .editorial-background h3 { margin-top:1.6rem; }
 .editorial-detail > a { font:.85rem/1.5 var(--sans); }
+
+.editorial-image { margin: 1rem 0; }
+.editorial-image img { display: block; width: 100%; height: auto; }
+.editorial-image figcaption { font-size: .85em; }
+.editorial-coverage > section { margin-top: 1rem; }
+.editorial-article p { white-space: pre-line; }
