@@ -105,7 +105,18 @@ class Store:
 
     @contextmanager
     def lock(self, name: str, timeout: float = 120):
-        """Exclusive lock shared by every process using this database (publication, export)."""
+        """Exclusive lock shared by every process using this database (publication, export).
+
+        Re-entrant within one Store, so publication can export while holding it.
+        """
+        held = self.__dict__.setdefault("_held", {})
+        if held.get(name):
+            held[name] += 1
+            try:
+                yield
+            finally:
+                held[name] -= 1
+            return
         safe = re.sub(r"[^a-z0-9_-]", "_", name.lower())
         with open(self.path.with_name(f"{self.path.name}.{safe}.lock"), "a") as handle:
             deadline = time.monotonic() + timeout
@@ -117,9 +128,11 @@ class Store:
                     if time.monotonic() > deadline:
                         raise LockTimeout(f"lock {name} is held by another process") from None
                     time.sleep(0.2)
+            held[name] = 1
             try:
                 yield
             finally:
+                held[name] = 0
                 fcntl.flock(handle, fcntl.LOCK_UN)
 
     def close(self) -> None:

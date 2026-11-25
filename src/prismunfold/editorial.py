@@ -409,12 +409,15 @@ def export_editorial(store, site_dir, stories=None):
     from .daily import export_daily
     from .export import _write
 
-    authored = [public_view(e) for e in editions(store)]
-    bulletins = imports(store)
-    if bulletins:
-        authored = merge_editions(authored, bulletins, store.all_stories() if stories is None else stories)
-    path = _write(Path(site_dir) / "api/v1/editorial/morgenbriefing.json", authored)
-    export_daily(authored, site_dir)
+    # Under the publication lock: a periodic export must not write an older state
+    # after a publication that committed in between.
+    with store.lock("edition-publication"):
+        authored = [public_view(e) for e in editions(store)]
+        bulletins = imports(store)
+        if bulletins:
+            authored = merge_editions(authored, bulletins, store.all_stories() if stories is None else stories)
+        path = _write(Path(site_dir) / "api/v1/editorial/morgenbriefing.json", authored)
+        export_daily(authored, site_dir)
     event(COMPONENT, "export_completed", editions=len(authored))
     return path
 

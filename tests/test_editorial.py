@@ -239,7 +239,8 @@ class RecoveryTests(unittest.TestCase):
                         with second.lock("edition-publication", timeout=0.3):
                             pass
                 with second.lock("edition-publication", timeout=0.3):
-                    pass
+                    with second.lock("edition-publication", timeout=0.3):  # re-entrant
+                        pass
             finally:
                 first.close()
                 second.close()

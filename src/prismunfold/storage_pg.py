@@ -105,16 +105,30 @@ class PostgresStore:
 
     @contextmanager
     def lock(self, name: str, timeout: float = 120):
-        """Session-level advisory lock shared by every pipeline process on this database."""
+        """Session-level advisory lock shared by every pipeline process on this database.
+
+        Re-entrant within one connection (as PostgreSQL advisory locks are).
+        """
+        held = self.__dict__.setdefault("_held", {})
+        if held.get(name):
+            held[name] += 1
+            try:
+                yield
+            finally:
+                held[name] -= 1
+            return
         deadline = time.monotonic() + timeout
         while not self.db.execute("SELECT pg_try_advisory_lock(hashtext(%s))", (name,)).fetchone()[0]:
             if time.monotonic() > deadline:
                 from .storage import LockTimeout
                 raise LockTimeout(f"lock {name} is held by another process")
             time.sleep(0.5)
+        held[name] = 1
         try:
             yield
         finally:
+            held[name] = 0
+            # Advisory unlock is not transactional; the caller decides commit or rollback.
             self.db.execute("SELECT pg_advisory_unlock(hashtext(%s))", (name,))
 
     def close(self) -> None:
