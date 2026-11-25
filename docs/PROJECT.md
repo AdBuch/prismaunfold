@@ -28,7 +28,7 @@ verified because a link exists.
 | 0.2 Reliable editorial and ingestion pipeline | prism-data import, provenance, source classification, granular states, recovery, scheduling, unified daily API, image rights | **Implemented and tested in CI fixtures; not yet verified on the production VM** |
 | 0.3 One newspaper, one daily edition, one Magazine | Frontend moves to `api/v1/daily`; Today's Edition replaces the separate Morgenbriefing/feed views; Magazine model | Planned. Brief: [phase-2-frontend-brief.md](phase-2-frontend-brief.md) |
 | 0.4 Personalisation and social | My PrismUnfold, followed topics, collections | Planned |
-| 0.5 Release engineering | Release automation, visual regression, production CD | Planned |
+| 0.5 Release engineering | Release automation, visual regression, production CD | Partly: release gate, gated deployment with backup and rollback (v0.2.0); visual regression and CD planned |
 
 ## Status by capability
 

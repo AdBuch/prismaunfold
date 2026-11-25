@@ -202,7 +202,9 @@ changes or on demand, never as a gate, because it depends on the network.
 - `docs/EDITORIAL_WORKFLOW.md`: contributions, states, publication policy, source checks, images
 - `docs/API.md`: the JSON API, including the unified daily edition
 - `docs/PRISM_DATA.md`: the prism-data bulletin import (German)
-- `docs/OPERATIONS.md`: deployment, secrets, scheduling, logging, recovery, rollback
+- `docs/OPERATIONS.md`: secrets, scheduling, logging, recovery, troubleshooting
+- `docs/RELEASE.md`: releases and the production deployment (`unfold-update`), backup, rollback
+- `CHANGELOG.md`: what each release contains
 - `docs/EDITORIAL_SPEC.md`: the editorial target of the Morgenbriefing
 - `docs/BRANCH_RECONCILIATION.md`: how the branches were consolidated in 0.1
 - `docs/audit.md`: the audit of 14 November 2026 (historical)

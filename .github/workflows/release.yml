@@ -1,0 +1,56 @@
+# A release is a tag vX.Y.Z on a commit of main for which the CI workflow succeeded.
+# This workflow checks exactly that and then publishes the GitHub release with the
+# matching CHANGELOG section. scripts/deploy-release.sh applies the same rule on the
+# server, so an unverified tag can neither be released nor deployed.
+name: Release
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+permissions:
+  contents: write
+  actions: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Tag is on main
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+
+      - name: CI succeeded for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The CI run for the tagged commit may still be running; wait up to 40 minutes.
+          for i in $(seq 1 80); do
+            state=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$GITHUB_SHA&per_page=100" \
+              --jq '[.workflow_runs[] | select(.name == "CI")] | if any(.conclusion == "success") then "success"
+                    elif any(.status != "completed") or length == 0 then "pending" else "failure" end')
+            echo "CI: $state"
+            [ "$state" = success ] && exit 0
+            [ "$state" = failure ] && exit 1
+            sleep 30
+          done
+          exit 1
+
+      - name: Release notes from CHANGELOG.md
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '/^## /{found = ($2 == v)} found' CHANGELOG.md > notes.md
+          test -s notes.md || { echo "CHANGELOG.md has no section for $version"; exit 1; }
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --title "PrismUnfold $GITHUB_REF_NAME" --notes-file notes.md
