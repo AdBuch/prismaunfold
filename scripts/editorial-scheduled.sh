@@ -19,9 +19,10 @@ quality_gate() {
 import json, sys
 with open(sys.argv[1]) as f:
     e = json.load(f)
-sections = {a["section"] for a in e["articles"]}
+sections = {a["section"] for a in e["articles"] if not a.get("review_required")}
+supported = sum(not a.get("review_required") for a in e["articles"])
 required = {"Schweiz Politik", "Peru Politik", "International", "Good News"}
-if not (e["date"] == sys.argv[2] and len(e["articles"]) >= 8 and len(sections) >= 7
+if not (e["date"] == sys.argv[2] and len(e["articles"]) >= 8 and supported >= 5 and len(sections) >= 7
         and required <= sections and e.get("magazine") and e.get("random")
         and {x["category"] for x in e.get("lagebild", [])}
         == {"Wichtig", "Überschätzt", "Unterberichtet", "Beobachten"}):
@@ -37,6 +38,18 @@ case "${1:-}" in
   generate)
     if [[ -s $ready ]]; then
       echo "Today's staged edition already exists"
+      exit 0
+    fi
+    # Recover an existing raw edition before spending any more model tokens.
+    shopt -s nullglob
+    candidates=("$base/$day."*/edition.json)
+    if ((${#candidates[@]})); then
+      report="${candidates[-1]}"
+      docker compose run --rm --no-deps -T --entrypoint python3 pipeline -m prismunfold.editorial validate "$day" < "$report" > "$(dirname "$report")/preview.json"
+      quality_gate "$(dirname "$report")/preview.json"
+      printf '%s\n' "$report" > "$ready.tmp"
+      mv "$ready.tmp" "$ready"
+      echo "Recovered staged edition: $report"
       exit 0
     fi
     # Runner emits a pointer only after successful validation. No eval of its output.
