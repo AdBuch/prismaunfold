@@ -119,20 +119,24 @@ class EditorialIntelligenceTests(unittest.TestCase):
         german = self.ei.draft(self.event_id, "de", writer)
         self.assertEqual(german["publication_status"], "draft_needs_review")
         self.assertEqual(self.ei.content_pool()["articles"], [])
-        with self.assertRaisesRegex(ValueError, "every published claim"):
+        with self.assertRaisesRegex(ValueError, "draft changed since review"):
             self.ei.approve(self.event_id, "de", reviewer="Editor",
+                            expected_draft_digest="0" * 64,
+                            checked_claim_sources={"vote": [doc_id]})
+        with self.assertRaisesRegex(ValueError, "every published claim"):
+            self.ei.approve(self.event_id, "de", reviewer="Editor", expected_draft_digest=german["draft_digest"],
                             checked_claim_sources={})
         with self.assertRaisesRegex(ValueError, "human reviewer"):
-            self.ei.approve(self.event_id, "de", reviewer="AI",
+            self.ei.approve(self.event_id, "de", reviewer="AI", expected_draft_digest=german["draft_digest"],
                             checked_claim_sources={"vote": [doc_id]})
-        article = self.ei.approve(self.event_id, "de", reviewer="Editor",
+        article = self.ei.approve(self.event_id, "de", reviewer="Editor", expected_draft_digest=german["draft_digest"],
                                   checked_claim_sources={"vote": [doc_id]})
         self.assertEqual(article["revision"], 1)
-        same = self.ei.approve(self.event_id, "de", reviewer="Editor",
+        same = self.ei.approve(self.event_id, "de", reviewer="Editor", expected_draft_digest=german["draft_digest"],
                                 checked_claim_sources={"vote": [doc_id]})
         self.assertEqual(same["approval"], article["approval"])
-        self.ei.draft(self.event_id, "es", writer)
-        self.ei.approve(self.event_id, "es", reviewer="Editor",
+        spanish = self.ei.draft(self.event_id, "es", writer)
+        self.ei.approve(self.event_id, "es", reviewer="Editor", expected_draft_digest=spanish["draft_digest"],
                         checked_claim_sources={"vote": [doc_id]})
         pool = self.ei.content_pool()
         self.assertEqual(pool["schema_version"], "prismunfold.content-pool/1")
@@ -158,15 +162,17 @@ class EditorialIntelligenceTests(unittest.TestCase):
                             source_type="official_document")
         self.ei.ingest([official])
         doc_id = validate_document(official)["document_id"]
-        self.ei.draft(self.event_id, "de", writer)
+        initial = self.ei.draft(self.event_id, "de", writer)
         self.ei.approve(self.event_id, "de", reviewer="Editor",
+                        expected_draft_digest=initial["draft_digest"],
                         checked_claim_sources={"vote": [doc_id]})
         def revised(dossier, language):
             raw = writer(dossier, language)
             raw["paragraphs"][0]["text"] = "Die Vorlage erhielt eine Mehrheit."
             return raw
-        self.ei.draft(self.event_id, "de", revised)
+        revised_draft = self.ei.draft(self.event_id, "de", revised)
         latest = self.ei.approve(self.event_id, "de", reviewer="Editor",
+                                 expected_draft_digest=revised_draft["draft_digest"],
                                  checked_claim_sources={"vote": [doc_id]})
         self.assertEqual(latest["revision"], 2)
         self.assertIsNotNone(self.ei.repo.get(f"revision|{latest['article_id']}|1"))
@@ -188,19 +194,21 @@ class EditorialIntelligenceTests(unittest.TestCase):
         evidence = self.ei.dossier(self.event_id)["claims"][0]["evidence"]
         self.assertIn("contradicts", [e["relation"] for e in evidence])
         self.assertEqual(self.ei.content_pool()["articles"], [])
-        self.ei.draft(self.event_id, "de", writer)
+        first_draft = self.ei.draft(self.event_id, "de", writer)
         supportive_id = validate_document(self.docs[0])["document_id"]
         contrary_id = validate_document(contradicted)["document_id"]
         with self.assertRaisesRegex(ValueError, "disputed claims"):
             self.ei.approve(self.event_id, "de", reviewer="Editor",
+                            expected_draft_digest=first_draft["draft_digest"],
                             checked_claim_sources={"vote": [supportive_id]})
         def with_disclosure(dossier, language):
             article = writer(dossier, language)
             article["uncertainties"] = ["Eine weitere Quelle widerspricht dieser Darstellung."]
             return article
-        self.ei.draft(self.event_id, "de", with_disclosure)
+        disclosed = self.ei.draft(self.event_id, "de", with_disclosure)
         published = self.ei.approve(
             self.event_id, "de", reviewer="Editor",
+            expected_draft_digest=disclosed["draft_digest"],
             checked_claim_sources={"vote": [supportive_id, contrary_id]})
         self.assertEqual(published["claim_status"]["vote"], "disputed_with_disclosure")
         self.assertEqual(len(self.ei.content_pool()["articles"][0]["source_references"]), 2)
