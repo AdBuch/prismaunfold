@@ -35,7 +35,7 @@ def _require(value, name: str) -> str:
 
 def _date(value: str) -> str:
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(_require(value, "published_at").replace("Z", "+00:00"))
         if parsed.tzinfo is None:
             raise ValueError
         return parsed.astimezone(timezone.utc).isoformat()
@@ -48,6 +48,8 @@ def validate_document(doc: dict) -> dict:
     if not isinstance(doc, dict):
         raise ValueError("document must be an object")
     rights = doc.get("rights") or {}
+    if not isinstance(rights, dict):
+        raise ValueError("rights must be an object")
     if rights.get("ai_processing") is not True:
         raise ValueError("source has no explicit AI-processing permission")
     url = _require(doc.get("url"), "url")
@@ -79,6 +81,13 @@ def validate_document(doc: dict) -> dict:
             "relation": relation,
             "locator": _require(claim.get("locator"), "evidence locator"),
         })
+    topics = doc.get("topics") or []
+    regions = doc.get("regions") or []
+    if (not isinstance(topics, list) or not isinstance(regions, list)
+            or not all(isinstance(x, str) for x in topics + regions)):
+        raise ValueError("topics and regions must be text arrays")
+    original_work_id = doc.get("original_work_id") or canonical_url(url)
+    _require(original_work_id, "original_work_id")
     clean = {
         "event_key": event_key,
         "headline": _require(doc.get("headline"), "headline"),
@@ -87,19 +96,17 @@ def validate_document(doc: dict) -> dict:
         "source_type": source_type,
         "origin_type": origin_type,
         "published_at": _date(doc.get("published_at")),
-        "original_work_id": doc.get("original_work_id") or canonical_url(url),
+        "original_work_id": original_work_id,
         "claims": claims,
         "rights": {"ai_processing": True,
                    "store_excerpt": rights.get("store_excerpt") is True,
                    "display_excerpt": rights.get("display_excerpt") is True},
         "excerpt": doc.get("excerpt", "") if rights.get("store_excerpt") is True else "",
-        "topics": sorted(set(doc.get("topics") or [])),
-        "regions": sorted(set(doc.get("regions") or [])),
+        "topics": sorted(set(topics)),
+        "regions": sorted(set(regions)),
     }
     if not isinstance(clean["excerpt"], str):
         raise ValueError("excerpt must be text")
-    if not all(isinstance(x, str) for x in clean["topics"] + clean["regions"]):
-        raise ValueError("topics and regions must be text")
     clean["document_id"] = "doc-" + digest(clean)[:20]
     clean["event_id"] = "evt-" + sha1_id("editorial-intelligence", event_key)
     return clean
@@ -230,7 +237,9 @@ class EditorialIntelligence:
             "headline": _require(raw.get("headline"), "headline"),
             "lead": _require(raw.get("lead"), "lead"),
             "paragraphs": paragraphs, "topics": dossier["topics"],
-            "regions": dossier["regions"], "article_variant": raw.get("article_variant", "standard_article"),
+            "regions": dossier["regions"],
+            "uncertainties": [_require(x, "uncertainty") for x in raw.get("uncertainties", [])],
+            "article_variant": raw.get("article_variant", "standard_article"),
             "editorial_importance": raw.get("editorial_importance", "normal"),
             "source_document_ids": sorted({e["document_id"] for c in dossier["claims"]
                                           for e in c["evidence"]}),
@@ -257,12 +266,23 @@ class EditorialIntelligence:
         used = {k for p in draft["paragraphs"] for k in p["claim_keys"]}
         if set(checked_claim_sources) != used:
             raise ValueError("every published claim requires explicit review")
+        claim_status = {}
         for key, source_ids in checked_claim_sources.items():
-            supporting = {e["document_id"] for e in claims[key]["evidence"]
+            evidence = claims[key]["evidence"]
+            supporting = {e["document_id"] for e in evidence
                           if e["relation"] == "supports" and e["origin_type"] == "original_publisher"}
-            if not source_ids or not set(source_ids) <= supporting:
-                raise ValueError(f"{key}: checked sources must have original supporting locators")
-        content = {**draft, "publication_status": "approved",
+            contradicting = {e["document_id"] for e in evidence
+                             if e["relation"] == "contradicts" and e["origin_type"] == "original_publisher"}
+            checked = set(source_ids)
+            if not checked or not checked <= (supporting | contradicting) or not (checked & supporting):
+                raise ValueError(f"{key}: checked sources need original supporting locators")
+            if contradicting:
+                if not draft["uncertainties"] or not (checked & contradicting):
+                    raise ValueError(f"{key}: disputed claims require checked contradictions and disclosure")
+                claim_status[key] = "disputed_with_disclosure"
+            else:
+                claim_status[key] = "human_reviewed_evidence_links"
+        content = {**draft, "claim_status": claim_status, "publication_status": "approved",
                    "approval": {"basis": "named_human_review", "reviewer": reviewer,
                                 "checked_claim_sources": checked_claim_sources,
                                 "approved_at": timestamp(utcnow())}}
