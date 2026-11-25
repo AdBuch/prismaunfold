@@ -2,7 +2,11 @@
 # Generate a source-linked Morgenbriefing with the existing Codex subscription.
 # Usage: bash scripts/bulletin.sh codex --dry-run|--publish
 #        bash scripts/bulletin.sh codex --publish-existing /path/to/morgenbriefing.json
+#
+# DEPRECATED (milestone 0.2): superseded by scripts/editorial.sh (Codex editorial edition)
+# and the prism-data importer. Kept only to publish runs saved by this script.
 set -Eeuo pipefail
+echo "scripts/bulletin.sh is deprecated; use scripts/editorial.sh (see docs/OPERATIONS.md)" >&2
 cd "$(dirname "$0")/.."
 [[ ${1:-} == codex ]] && { [[ ( ${2:-} == --dry-run || ${2:-} == --publish ) && $# == 2 ]] || [[ ${2:-} == --publish-existing && $# == 3 ]]; } || {
   echo "Usage: bash scripts/bulletin.sh codex --dry-run|--publish|--publish-existing FILE" >&2; exit 2;
