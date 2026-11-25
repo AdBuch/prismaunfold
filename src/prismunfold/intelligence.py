@@ -252,10 +252,12 @@ class EditorialIntelligence:
                                           for e in c["evidence"]}),
             "publication_status": "draft_needs_review",
         }
+        draft["draft_digest"] = digest(draft)
         self.repo.put(f"draft|{event_id}|{language}", "draft", event_id, draft)
         return draft
 
     def approve(self, event_id: str, language: str, *, reviewer: str,
+                expected_draft_digest: str,
                 checked_claim_sources: dict[str, list[str]]) -> dict:
         """Human approval of claim-to-source links and the exact language variant.
 
@@ -268,6 +270,8 @@ class EditorialIntelligence:
         draft = self.repo.get(f"draft|{event_id}|{language}")
         if not draft:
             raise ValueError("no draft to review")
+        if not expected_draft_digest or expected_draft_digest != draft["draft_digest"]:
+            raise ValueError("draft changed since review; inspect and approve the exact digest")
         dossier = self.dossier(event_id)
         claims = {c["key"]: c for c in dossier["claims"]}
         used = {k for p in draft["paragraphs"] for k in p["claim_keys"]}
