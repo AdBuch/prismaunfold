@@ -43,9 +43,37 @@ class PostgresStoreTest(unittest.TestCase):
         self.assertFalse(self.store.save_edition_revision(key, "de", now - timedelta(hours=1), {"version": 1}))
         self.assertEqual(self.store.get_edition(key), {"version": 2})
 
+    def test_contributions_are_idempotent_and_ordered(self):
+        from prismunfold import contributions as contrib
+        first = contrib.new("prism-data", "k/2026-11-25", "2026-11-25", "a" * 64, generated_at="2026-11-25T06:00:00+00:00",
+                            raw={"x": 1})
+        self.assertTrue(self.store.save_contribution(first))
+        self.assertFalse(self.store.save_contribution(first))
+        second = contrib.new("prism-data", "k/2026-11-25", "2026-11-25", "b" * 64, generated_at="2026-11-25T07:00:00+00:00")
+        self.assertTrue(self.store.save_contribution(second))
+        self.store.update_contribution(contrib.transition(first, "superseded"))
+        self.store.commit()
+        rows = self.store.list_contributions(edition_date="2026-11-25")
+        self.assertEqual([r["state"] for r in rows], ["superseded", "received"])
+        self.assertEqual(self.store.get_contribution(first["id"])["raw"], {"x": 1})
+        self.assertEqual(self.store.schema_version(), 2)
+
+    def test_advisory_lock_is_exclusive_across_connections(self):
+        from prismunfold.storage import LockTimeout
+        other = open_store(URL)
+        try:
+            with self.store.lock("edition-publication"):
+                with self.assertRaises(LockTimeout):
+                    with other.lock("edition-publication", timeout=0.5):
+                        pass
+            with other.lock("edition-publication", timeout=1):
+                pass
+        finally:
+            other.close()
+
     def setUp(self):
         self.store = open_store(URL)
-        self.store.db.execute("TRUNCATE articles, editions, stories")
+        self.store.db.execute("TRUNCATE articles, editions, stories, contributions")
         self.store.commit()
         self.first, _ = parse_report(REPORT)
         self.second, _ = parse_report(

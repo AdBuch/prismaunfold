@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 import time
+from contextlib import contextmanager
 from datetime import datetime
 
 import psycopg
@@ -51,7 +52,33 @@ SCHEMA = (
     """,
     "CREATE INDEX IF NOT EXISTS stories_topic ON stories (topic_slug, created_at)",
     "CREATE INDEX IF NOT EXISTS stories_search ON stories USING GIN (search)",
+    # Schema version 2 (milestone 0.2): additive only.
+    """
+    CREATE TABLE IF NOT EXISTS contributions (
+        id TEXT PRIMARY KEY,
+        provider TEXT NOT NULL,
+        source_key TEXT NOT NULL,
+        edition_date DATE NOT NULL,
+        content_hash TEXT NOT NULL,
+        generated_at TIMESTAMPTZ,
+        received_at TIMESTAMPTZ NOT NULL,
+        state TEXT NOT NULL,
+        data JSONB NOT NULL,
+        UNIQUE (source_key, content_hash)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS contributions_date ON contributions (edition_date, provider)",
+    """
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+        version INTEGER PRIMARY KEY,
+        applied_at TIMESTAMPTZ NOT NULL
+    )
+    """,
+    "INSERT INTO schema_migrations (version, applied_at) VALUES (1, 'epoch') ON CONFLICT DO NOTHING",
+    "INSERT INTO schema_migrations (version, applied_at) VALUES (2, now()) ON CONFLICT DO NOTHING",
 )
+
+SCHEMA_VERSION = 2
 
 WORD_RE = re.compile(r"\w+")
 
@@ -75,6 +102,20 @@ class PostgresStore:
         for statement in SCHEMA:
             self.db.execute(statement)
         self.db.commit()
+
+    @contextmanager
+    def lock(self, name: str, timeout: float = 120):
+        """Session-level advisory lock shared by every pipeline process on this database."""
+        deadline = time.monotonic() + timeout
+        while not self.db.execute("SELECT pg_try_advisory_lock(hashtext(%s))", (name,)).fetchone()[0]:
+            if time.monotonic() > deadline:
+                from .storage import LockTimeout
+                raise LockTimeout(f"lock {name} is held by another process")
+            time.sleep(0.5)
+        try:
+            yield
+        finally:
+            self.db.execute("SELECT pg_advisory_unlock(hashtext(%s))", (name,))
 
     def close(self) -> None:
         self.db.commit()
@@ -117,6 +158,40 @@ class PostgresStore:
             (edition_id, language, revised_at, Jsonb(payload)),
         )
         return result.rowcount == 1
+
+    def schema_version(self) -> int:
+        return self.db.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0]
+
+    # --- Editorial contributions (provenance, revisions, states); see contributions.py ---
+
+    def save_contribution(self, c: dict) -> bool:
+        """Insert a received revision. False if the same content was already recorded."""
+        result = self.db.execute(
+            "INSERT INTO contributions (id, provider, source_key, edition_date, content_hash, generated_at, "
+            "received_at, state, data) VALUES (%s, %s, %s, %s::date, %s, %s::timestamptz, %s::timestamptz, %s, %s) "
+            "ON CONFLICT (source_key, content_hash) DO NOTHING",
+            (c["id"], c["provider"], c["source_key"], c["edition_date"], c["content_hash"],
+             c.get("generated_at"), c["received_at"], c["state"], Jsonb(c)),
+        )
+        return result.rowcount == 1
+
+    def update_contribution(self, c: dict) -> None:
+        self.db.execute("UPDATE contributions SET state = %s, data = %s WHERE id = %s",
+                        (c["state"], Jsonb(c), c["id"]))
+
+    def get_contribution(self, contribution_id: str) -> dict | None:
+        row = self.db.execute("SELECT data FROM contributions WHERE id = %s", (contribution_id,)).fetchone()
+        return row[0] if row else None
+
+    def list_contributions(self, source_key: str | None = None, edition_date: str | None = None,
+                           provider: str | None = None) -> list[dict]:
+        rows = self.db.execute(
+            "SELECT data FROM contributions WHERE (%s::text IS NULL OR source_key = %s::text) "
+            "AND (%s::date IS NULL OR edition_date = %s::date) AND (%s::text IS NULL OR provider = %s::text) "
+            "ORDER BY edition_date, generated_at NULLS FIRST, received_at",
+            (source_key, source_key, edition_date, edition_date, provider, provider),
+        ).fetchall()
+        return [row[0] for row in rows]
 
     # --- Stories written by collector agents, plus the archive index over them ---
 

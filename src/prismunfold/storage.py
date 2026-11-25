@@ -8,9 +8,12 @@ Both backends offer the same methods. Records are JSON documents next to indexed
 
 from __future__ import annotations
 
+import fcntl
 import json
 import re
 import sqlite3
+import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -48,7 +51,30 @@ CREATE VIRTUAL TABLE IF NOT EXISTS story_index USING fts5(
     body,
     tokenize = "unicode61 remove_diacritics 2"
 );
+-- Added in schema version 2 (milestone 0.2). Additive only: older databases gain
+-- these tables on the next start; nothing existing is changed.
+CREATE TABLE IF NOT EXISTS contributions (
+    id TEXT PRIMARY KEY,
+    provider TEXT NOT NULL,
+    source_key TEXT NOT NULL,
+    edition_date TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    generated_at TEXT,
+    received_at TEXT NOT NULL,
+    state TEXT NOT NULL,
+    data TEXT NOT NULL,
+    UNIQUE (source_key, content_hash)
+);
+CREATE INDEX IF NOT EXISTS contributions_date ON contributions (edition_date, provider);
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version INTEGER PRIMARY KEY,
+    applied_at TEXT NOT NULL
+);
+INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (1, '1970-01-01T00:00:00+00:00');
+INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (2, datetime('now'));
 """
+
+SCHEMA_VERSION = 2
 
 WORD_RE = re.compile(r"\w+")
 
@@ -66,11 +92,35 @@ def open_store(target: str | Path):
     return Store(target)
 
 
+class LockTimeout(RuntimeError):
+    pass
+
+
 class Store:
     def __init__(self, path: str | Path) -> None:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
+        self.path = Path(path)
         self.db = sqlite3.connect(str(path))
         self.db.executescript(SCHEMA)
+
+    @contextmanager
+    def lock(self, name: str, timeout: float = 120):
+        """Exclusive lock shared by every process using this database (publication, export)."""
+        safe = re.sub(r"[^a-z0-9_-]", "_", name.lower())
+        with open(self.path.with_name(f"{self.path.name}.{safe}.lock"), "a") as handle:
+            deadline = time.monotonic() + timeout
+            while True:
+                try:
+                    fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if time.monotonic() > deadline:
+                        raise LockTimeout(f"lock {name} is held by another process") from None
+                    time.sleep(0.2)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle, fcntl.LOCK_UN)
 
     def close(self) -> None:
         self.db.commit()
@@ -116,6 +166,40 @@ class Store:
             (edition_id, language, timestamp, json.dumps(payload, ensure_ascii=False)),
         )
         return result.rowcount == 1
+
+    def schema_version(self) -> int:
+        return self.db.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0]
+
+    # --- Editorial contributions (provenance, revisions, states); see contributions.py ---
+
+    def save_contribution(self, c: dict) -> bool:
+        """Insert a received revision. False if the same content was already recorded."""
+        result = self.db.execute(
+            "INSERT INTO contributions (id, provider, source_key, edition_date, content_hash, generated_at, "
+            "received_at, state, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(source_key, content_hash) DO NOTHING",
+            (c["id"], c["provider"], c["source_key"], c["edition_date"], c["content_hash"],
+             c.get("generated_at"), c["received_at"], c["state"], json.dumps(c, ensure_ascii=False)),
+        )
+        return result.rowcount == 1
+
+    def update_contribution(self, c: dict) -> None:
+        self.db.execute("UPDATE contributions SET state = ?, data = ? WHERE id = ?",
+                        (c["state"], json.dumps(c, ensure_ascii=False), c["id"]))
+
+    def get_contribution(self, contribution_id: str) -> dict | None:
+        row = self.db.execute("SELECT data FROM contributions WHERE id = ?", (contribution_id,)).fetchone()
+        return json.loads(row[0]) if row else None
+
+    def list_contributions(self, source_key: str | None = None, edition_date: str | None = None,
+                           provider: str | None = None) -> list[dict]:
+        rows = self.db.execute(
+            "SELECT data FROM contributions WHERE (? IS NULL OR source_key = ?) "
+            "AND (? IS NULL OR edition_date = ?) AND (? IS NULL OR provider = ?) "
+            "ORDER BY edition_date, COALESCE(generated_at, ''), received_at",
+            (source_key, source_key, edition_date, edition_date, provider, provider),
+        ).fetchall()
+        return [json.loads(row[0]) for row in rows]
 
     # --- Stories written by collector agents, plus the archive index over them ---
 
