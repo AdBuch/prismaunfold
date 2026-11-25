@@ -172,13 +172,28 @@ def editions(store):
     return [json.loads(row[0]) if isinstance(row[0], str) else row[0] for row in rows]
 
 
-def export_editorial(store, site_dir):
+def export_editorial(store, site_dir, stories=None):
+    from .bulletin import imports, merge_editions
     from .export import _write
-    return _write(Path(site_dir) / "api/v1/editorial/morgenbriefing.json", editions(store))
+
+    authored = editions(store)
+    bulletins = imports(store)
+    if bulletins:
+        authored = merge_editions(authored, bulletins, store.all_stories() if stories is None else stories)
+    return _write(Path(site_dir) / "api/v1/editorial/morgenbriefing.json", authored)
 
 
 def main():
     mode = sys.argv[1]
+    if mode == "bulletin-context":
+        from .bulletin import editorial_context
+
+        store = open_store(os.environ["DATABASE_URL"])
+        try:
+            print(json.dumps(editorial_context(store, sys.argv[2]), ensure_ascii=False))
+        finally:
+            store.close()
+        return
     if mode == "history":
         store = open_store(os.environ["DATABASE_URL"])
         try:

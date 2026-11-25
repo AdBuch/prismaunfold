@@ -102,6 +102,21 @@ class Store:
             (edition_id, language, _utc_iso(built_at), json.dumps(payload, ensure_ascii=False)),
         )
 
+    def get_edition(self, edition_id: str) -> dict | None:
+        row = self.db.execute("SELECT data FROM editions WHERE id = ?", (edition_id,)).fetchone()
+        return json.loads(row[0]) if row else None
+
+    def save_edition_revision(self, edition_id: str, language: str, revised_at: datetime, payload: dict) -> bool:
+        timestamp = revised_at.astimezone(timezone.utc).isoformat(timespec="microseconds")
+        result = self.db.execute(
+            "INSERT INTO editions (id, language, built_at, data) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(id) DO UPDATE SET language = excluded.language, "
+            "built_at = excluded.built_at, data = excluded.data "
+            "WHERE excluded.built_at >= editions.built_at AND excluded.data <> editions.data",
+            (edition_id, language, timestamp, json.dumps(payload, ensure_ascii=False)),
+        )
+        return result.rowcount == 1
+
     # --- Stories written by collector agents, plus the archive index over them ---
 
     def save_story(self, story: Story) -> None:

@@ -162,6 +162,27 @@ def _reports(args: argparse.Namespace, cfg: dict) -> int:
     return 1 if rejected else 0
 
 
+def _import_bulletin(args: argparse.Namespace, cfg: dict) -> int:
+    import logging
+    from .bulletin import import_daily
+    from .editorial import export_editorial
+
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    store = _open(args, cfg)
+    try:
+        changed = import_daily(store, args.secret_file, _parse_now(args.now), args.date)
+        if changed or args.date:
+            export_editorial(store, args.site or cfg["site_dir"])
+    except (ValueError, OSError) as error:
+        # Configuration/network errors are redacted by the importer. JSON errors
+        # carry offsets, never the submitted text or the access token.
+        logging.error("prism-data import failed (%s): %s", type(error).__name__, error)
+        return 1
+    finally:
+        store.close()
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="prismunfold", description="Build PrismUnfold editions.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -204,9 +225,15 @@ def main(argv: list[str] | None = None) -> int:
         help="open every cited URL; drop sources that do not answer (needs network)",
     )
 
+    bulletin_cmd = sub.add_parser("import-bulletin", parents=[common], help="import a private GitHub morning bulletin")
+    bulletin_cmd.add_argument("--secret-file", default=os.environ.get("PRISM_DATA_TOKEN_FILE", "/run/secrets/prism_data_token"))
+    bulletin_cmd.add_argument("--date", help="explicit YYYY-MM-DD backfill")
+    bulletin_cmd.add_argument("--now", help="override the clock for testing")
+
     args = parser.parse_args(argv)
     cfg = load_config(args.config)
-    return {"run": _run, "context": _context, "plan": _plan, "status": _status, "reports": _reports}[args.command](args, cfg)
+    return {"run": _run, "context": _context, "plan": _plan, "status": _status, "reports": _reports,
+            "import-bulletin": _import_bulletin}[args.command](args, cfg)
 
 
 if __name__ == "__main__":

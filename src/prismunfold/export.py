@@ -19,6 +19,7 @@ import json
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 from .compose import compose_edition, image_for, state_of
 from .models import Story
@@ -46,9 +47,16 @@ STATE_NOTE = {
 def _write(path: Path, payload: object) -> str:
     """Write atomically so the web server never serves half a file."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-    os.replace(tmp, path)
+    with NamedTemporaryFile(mode="w", dir=path.parent, encoding="utf-8", delete=False) as file:
+        tmp = Path(file.name)
+        try:
+            json.dump(payload, file, ensure_ascii=False, indent=1)
+            file.write("\n")
+            file.flush()
+            os.fchmod(file.fileno(), 0o644)
+            os.replace(tmp, path)
+        finally:
+            tmp.unlink(missing_ok=True)
     return str(path)
 
 
@@ -221,5 +229,5 @@ def export_site(store, site_dir: str | Path, now: datetime | None = None) -> lis
     # Editorial editions are stored separately from the feed-based newspaper.
     from .editorial import export_editorial
     if hasattr(store, 'db'):
-        written.append(export_editorial(store, site_dir))
+        written.append(export_editorial(store, site_dir, stories))
     return written

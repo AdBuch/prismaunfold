@@ -199,3 +199,9 @@ changes or on demand, never as a gate, because it depends on the network.
 - `collectors/README.md`: the agent images
 - `catalog/README.md`: the source catalog and how to review a source
 - `frontend/README.md`: the frontend prototype's original notes
+
+### Optional: GitHub-Morgenbriefing als zusätzliche Quelle
+
+Der Pipeline-Container kann tägliche Bulletins aus einem privaten GitHub-Repository
+in die redaktionelle Tagesausgabe integrieren. Einrichtung, Quellenrolle und
+Betrieb stehen in der [Prism-Data-Dokumentation](docs/PRISM_DATA.md).

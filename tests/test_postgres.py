@@ -35,6 +35,14 @@ class OpenStoreTest(unittest.TestCase):
 
 @unittest.skipUnless(URL, "TEST_DATABASE_URL is not set")
 class PostgresStoreTest(unittest.TestCase):
+    def test_edition_revision_rejects_stale_and_identical_writes(self):
+        key = "bulletin|morgenbriefing|2026-11-25"
+        now = datetime(2026, 11, 25, 7, tzinfo=timezone.utc)
+        self.assertTrue(self.store.save_edition_revision(key, "de", now, {"version": 2}))
+        self.assertFalse(self.store.save_edition_revision(key, "de", now, {"version": 2}))
+        self.assertFalse(self.store.save_edition_revision(key, "de", now - timedelta(hours=1), {"version": 1}))
+        self.assertEqual(self.store.get_edition(key), {"version": 2})
+
     def setUp(self):
         self.store = open_store(URL)
         self.store.db.execute("TRUNCATE articles, editions, stories")

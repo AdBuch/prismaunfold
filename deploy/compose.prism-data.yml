@@ -1,0 +1,10 @@
+services:
+  pipeline:
+    environment:
+      PRISM_DATA_TOKEN_FILE: /run/secrets/prism_data_token
+    secrets:
+      - prism_data_token
+
+secrets:
+  prism_data_token:
+    file: ${PRISM_DATA_SECRET_PATH:?set an absolute path to the local prism-data token file}

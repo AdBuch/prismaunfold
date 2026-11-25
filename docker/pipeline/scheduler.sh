@@ -25,6 +25,9 @@ LINK_FLAG="--check-links"
 
 while :; do
   echo "pipeline: cycle start $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  if [ -n "${PRISM_DATA_TOKEN_FILE:-}" ]; then
+    cli import-bulletin || echo "pipeline: bulletin import failed; continuing" >&2
+  fi
   cli plan --topics "${TOPICS_FILE:-/app/config/topics.txt}" --shared-dir /shared --reports-dir /out \
     || echo "pipeline: plan failed" >&2
   cli status --reports-dir /out || true
