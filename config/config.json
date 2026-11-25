@@ -10,5 +10,6 @@
   "max_events_per_topic": 5,
   "catalog_path": "catalog/sources.json",
   "db_path": "data/prismunfold.sqlite3",
-  "site_dir": "site"
+  "site_dir": "site",
+  "editorial": {"auto_publish": {"min_articles": 5, "min_sections": 3}}
 }

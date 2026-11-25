@@ -1,10 +1,17 @@
+import json
+import os
+import tempfile
+import time
 import unittest
 from datetime import datetime, timezone
-from tempfile import TemporaryDirectory
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
-from prismunfold.editorial import validate, editions, export_editorial
+from prismunfold.editorial import (apply_policy, editions, export_editorial, problems, public_view, publish,
+                                   review_article, select_candidate, validate)
 from prismunfold.storage import open_store
+
+FIXTURES = Path(__file__).parent / "fixtures" / "editorial"
 
 
 def sample():
@@ -18,19 +25,27 @@ def sample():
             "magazine": {"headline": "Magazin", "lead": "Vorspann", "paragraphs": paragraphs(5, 80)}}
 
 
-class EditorialTests(unittest.TestCase):
+def ap_probe(url):
+    """The 25 November 2026 incident: AP answers 403 to HEAD and GET."""
+    return "restricted" if "apnews.com" in url else "reachable"
+
+
+class EditorialValidationTests(unittest.TestCase):
     def test_complete_edition_and_archive(self):
-        payload = validate(sample(), lambda url: True)
+        payload = validate(sample(), lambda url: True, excluded=set())
         self.assertEqual(len(payload["articles"]), 6)
+        self.assertTrue(all(a["state"] == "validated" for a in payload["articles"]))
         self.assertEqual(len(payload["magazine"]["paragraphs"]), 5)
         with TemporaryDirectory() as tmp:
             store = open_store(Path(tmp) / "test.db")
             try:
-                store.save_edition("editorial|morgenbriefing|2026-11-24", "de", datetime.now(timezone.utc), payload)
-                store.commit()
-                self.assertEqual(editions(store), [payload])
+                outcome, stored = publish(store, sample(), payload, auto=True, site_dir=tmp)
+                self.assertEqual(outcome, "published")
+                self.assertEqual(editions(store)[0]["date"], "2026-11-24")
                 self.assertEqual(store.daily_editions(), {})
-                self.assertTrue(Path(export_editorial(store, tmp)).exists())
+                exported = json.loads((Path(tmp) / "api/v1/editorial/morgenbriefing.json").read_text())
+                self.assertNotIn("withheld", exported[0])
+                self.assertTrue((Path(tmp) / "api/v1/daily/2026-11-24.json").exists())
             finally:
                 store.close()
 
@@ -38,7 +53,7 @@ class EditorialTests(unittest.TestCase):
         raw = sample()
         raw["articles"][0]["topic"] = "swiss-politics"
         raw["articles"][0]["background"] = [{"heading": "Kontext", "text": "Hintergrund", "source_ids": ["a"]}]
-        result = validate(raw, lambda url: True)
+        result = validate(raw, lambda url: True, excluded=set())
         self.assertEqual(result["articles"][0]["topic"], "swiss-politics")
         self.assertEqual(result["articles"][0]["background"][0]["heading"], "Kontext")
 
@@ -46,34 +61,211 @@ class EditorialTests(unittest.TestCase):
         raw = sample()
         raw["random"] = {"text": "Belegter Fakt", "source_ids": ["a"]}
         raw["lagebild"] = {"Wichtig": {"text": "Analyse", "source_ids": ["b"]}}
-        result = validate(raw, lambda url: True)
+        result = validate(raw, lambda url: True, excluded=set())
         self.assertEqual(result["random"]["text"], "Belegter Fakt")
         self.assertEqual(result["lagebild"][0]["category"], "Wichtig")
         self.assertEqual(result["lagebild"][0]["sources"][0]["id"], "b")
 
-    def test_missing_source_omits_whole_article(self):
+    def test_one_failed_paragraph_marks_only_that_article(self):
         raw = sample()
         raw["articles"][0]["paragraphs"][0]["source_ids"] = ["b"]
-        payload = validate(raw, lambda url: "admin.ch" in url)
-        self.assertEqual(len(payload["articles"]), 5)
-        self.assertTrue(payload["warnings"])
+        payload = validate(raw, lambda url: "admin.ch" in url, excluded=set())
+        self.assertEqual(len(payload["articles"]), 6)
+        first = next(a for a in payload["articles"] if a["headline"] == "Schweiz Politik")
+        self.assertEqual(first["state"], "review_required")
+        self.assertEqual(first["review_reasons"][0]["paragraph"], 1)
+        self.assertEqual(first["review_reasons"][0]["reason"], "only_missing_sources")
+        self.assertEqual(sum(a["state"] == "validated" for a in payload["articles"]), 5)
+        found = problems(payload)
+        self.assertEqual(found[0]["sources"][0]["url"], "https://www.un.org/b")
 
-    def test_bad_magazine_rejects_edition(self):
+    def test_malformed_article_is_listed_not_fatal(self):
+        raw = sample()
+        raw["articles"][1]["section"] = "Unbekannt"
+        payload = validate(raw, lambda url: True, excluded=set())
+        self.assertEqual(len(payload["articles"]), 5)
+        self.assertEqual(payload["invalid"][0]["reason"], "Unknown section")
+
+    def test_failed_magazine_keeps_the_edition_publishable(self):
         raw = sample()
         raw["magazine"]["paragraphs"][0]["source_ids"] = ["missing"]
-        with self.assertRaises(ValueError):
-            validate(raw, lambda url: True)
+        payload = validate(raw, lambda url: True, excluded=set())
+        self.assertIsNone(payload["magazine"])
+        self.assertEqual(payload["invalid"][0]["kind"], "magazine")
+        result = apply_policy(payload, auto=True)
+        self.assertEqual(len(result["articles"]), 6)
+        self.assertEqual(result["completeness"], "partial")
 
-    def test_excluded_source_rejected(self):
-        raw = sample()
-        raw["sources"][0]["url"] = "https://example.com/article"
-        with self.assertRaises(ValueError):
-            validate(raw, lambda url: True, excluded={"example.com"})
-
-    def test_paywall_requires_other_support(self):
+    def test_paywalled_only_paragraph_needs_review(self):
         raw = sample()
         raw["sources"][1]["access"] = "paywalled"
-        self.assertEqual(len(validate(raw, lambda url: "admin.ch" in url, excluded=set())["articles"]), 6)
+        self.assertTrue(all(a["state"] == "validated"
+                            for a in validate(raw, lambda url: "admin.ch" in url, excluded=set())["articles"]))
         raw["magazine"]["paragraphs"][0]["source_ids"] = ["b"]
-        with self.assertRaises(ValueError):
-            validate(raw, lambda url: True, excluded=set())
+        payload = validate(raw, lambda url: True, excluded=set())
+        self.assertEqual(payload["magazine"]["state"], "review_required")
+        self.assertEqual(payload["magazine"]["review_reasons"][0]["reason"], "only_restricted_sources")
+
+    def test_excluded_source_is_removed_and_flagged_not_edition_fatal(self):
+        raw = sample()
+        raw["sources"][0]["url"] = "https://example.com/article"
+        payload = validate(raw, lambda url: True, excluded={"example.com"})
+        self.assertTrue(all(a["state"] == "review_required" for a in payload["articles"]))
+        self.assertNotIn("a", payload["articles"][0]["paragraphs"][0]["source_ids"])
+        raw["articles"][0]["paragraphs"][0]["source_ids"] = ["a"]
+        payload = validate(raw, lambda url: True, excluded={"example.com"})
+        self.assertEqual(payload["articles"][0]["state"], "rejected")
+
+    def test_unsafe_source_rejects_only_dependent_article(self):
+        raw = sample()
+        raw["sources"].append({"id": "c", "url": "https://intranet.example.net/x", "publisher": "X", "title": "X"})
+        raw["articles"][2]["paragraphs"][0]["source_ids"] = ["c"]
+        payload = validate(raw, lambda url: "unsafe" if "intranet" in url else "reachable", excluded=set())
+        states = sorted(a["state"] for a in payload["articles"])
+        self.assertEqual(states.count("rejected"), 1)
+        self.assertEqual(states.count("validated"), 5)
+        result = apply_policy(payload, auto=True)
+        self.assertEqual(len(result["articles"]), 5)
+        self.assertEqual(result["withheld"][0]["state"], "rejected")
+
+    def test_transient_source_state_is_distinct(self):
+        raw = sample()
+        payload = validate(raw, lambda url: "timeout", excluded=set())
+        self.assertEqual(payload["articles"][0]["review_reasons"][0]["reason"], "sources_temporarily_unreachable")
+
+    def test_legacy_combined_status_is_read_as_unsafe(self):
+        payload = validate(sample(), lambda url: "unsafe_or_unresolved", excluded=set())
+        self.assertTrue(all(a["state"] == "rejected" for a in payload["articles"]))
+
+    def test_partial_edition_policy(self):
+        raw = sample()
+        payload = validate(raw, lambda url: "admin.ch" not in url and "un.org" not in url, excluded=set())
+        with self.assertRaisesRegex(ValueError, "Publication refused"):
+            apply_policy(payload, auto=True)
+        manual = apply_policy(payload, auto=False, approve_review_required=True, allow_partial=True, reviewer="ed")
+        self.assertEqual(len(manual["articles"]), 6)
+        self.assertTrue(all(a["approval"]["by"] == "ed" for a in manual["articles"]))
+
+
+class AP403RegressionTest(unittest.TestCase):
+    """25 Nov 2026: one AP URL answered 403 and the whole Codex edition failed."""
+
+    def setUp(self):
+        self.raw = json.loads((FIXTURES / "2026-11-25-ap403.json").read_text(encoding="utf-8"))
+
+    def test_403_no_longer_rejects_the_edition(self):
+        payload = validate(self.raw, ap_probe, excluded=set())
+        self.assertEqual(len(payload["articles"]), 10)
+        crisis = next(a for a in payload["articles"] if a["section"] == "Krisen- und Konfliktgebiete")
+        self.assertEqual(crisis["state"], "validated")  # AP is supplementary next to UN
+        ap = next(s for s in crisis["sources"] if s["id"] == "ap")
+        self.assertEqual(ap["link_status"], "restricted")
+        self.assertEqual(payload["magazine"]["state"], "review_required")
+        result = apply_policy(payload, auto=True)
+        self.assertEqual(len(result["articles"]), 10)
+        self.assertIsNone(result["magazine"])
+        self.assertEqual(result["withheld"][0]["kind"], "magazine")
+        self.assertEqual(result["completeness"], "partial")
+
+    def test_withheld_magazine_can_be_approved_later_without_regeneration(self):
+        payload = validate(self.raw, ap_probe, excluded=set())
+        with TemporaryDirectory() as tmp:
+            store = open_store(Path(tmp) / "db")
+            try:
+                publish(store, self.raw, payload, auto=True, site_dir=tmp)
+                magazine_id = payload["magazine"]["article_id"]
+                edition = review_article(store, "2026-11-25", magazine_id, "approve", "Adrian", "AP checked by hand",
+                                         site_dir=tmp)
+                self.assertEqual(edition["magazine"]["approval"]["by"], "Adrian")
+                self.assertTrue(edition["magazine"]["review_required"])
+                exported = json.loads((Path(tmp) / "api/v1/editorial/morgenbriefing.json").read_text())
+                self.assertEqual(exported[0]["magazine"]["headline"], payload["magazine"]["headline"])
+                review_article(store, "2026-11-25", magazine_id, "reject", "Adrian", site_dir=tmp)
+                with self.assertRaisesRegex(ValueError, "cannot be approved"):
+                    review_article(store, "2026-11-25", magazine_id, "approve", "Adrian", site_dir=tmp)
+            finally:
+                store.close()
+
+
+class RecoveryTests(unittest.TestCase):
+    def test_publish_is_idempotent_and_refuses_silent_overwrite(self):
+        raw = sample()
+        payload = validate(raw, lambda url: True, excluded=set())
+        with TemporaryDirectory() as tmp:
+            store = open_store(Path(tmp) / "db")
+            try:
+                self.assertEqual(publish(store, raw, payload, auto=True, site_dir=tmp)[0], "published")
+                # A retry after a failed export (same content) only re-exports.
+                (Path(tmp) / "api/v1/editorial/morgenbriefing.json").unlink()
+                self.assertEqual(publish(store, raw, payload, auto=True, site_dir=tmp)[0], "already_published")
+                self.assertTrue((Path(tmp) / "api/v1/editorial/morgenbriefing.json").exists())
+                changed = sample()
+                changed["articles"][0]["lead"] = "Korrigierter Vorspann"
+                changed_payload = validate(changed, lambda url: True, excluded=set())
+                with self.assertRaisesRegex(ValueError, "--replace"):
+                    publish(store, changed, changed_payload, auto=True, site_dir=tmp)
+                self.assertEqual(publish(store, changed, changed_payload, auto=False, replace=True, site_dir=tmp)[0], "published")
+                states = [c["state"] for c in store.list_contributions(edition_date="2026-11-24")]
+                self.assertEqual(sorted(states), ["published", "superseded"])
+                record = store.list_contributions(edition_date="2026-11-24")[0]
+                self.assertEqual(record["raw"]["date"], "2026-11-24")  # raw document preserved
+            finally:
+                store.close()
+
+    def test_select_candidate_is_deterministic_and_never_modifies_raw_files(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            good, partial, broken = base / "2026-11-24.zIa6G9", base / "2026-11-24.aaaaaa", base / "2026-11-24.bbbbbb"
+            for d in (good, partial, broken):
+                d.mkdir()
+            raw = sample()
+            (good / "edition.json").write_text(json.dumps(raw))
+            repaired = dict(raw, articles=raw["articles"][:4])
+            (partial / "edition.json").write_text(json.dumps(repaired))
+            (broken / "edition.json").write_text("{not json")
+            before = {p: p.read_bytes() for p in base.glob("*/edition.json")}
+            os.utime(partial / "edition.json", (time.time() + 60, time.time() + 60))
+            self.assertEqual(select_candidate(base, "2026-11-24"), good / "edition.json")
+            self.assertEqual({p: p.read_bytes() for p in base.glob("*/edition.json")}, before)
+            self.assertIsNone(select_candidate(base, "2026-11-23"))
+
+    def test_concurrent_publication_is_serialised(self):
+        from prismunfold.storage import LockTimeout
+        with TemporaryDirectory() as tmp:
+            first, second = open_store(Path(tmp) / "db"), open_store(Path(tmp) / "db")
+            try:
+                with first.lock("edition-publication"):
+                    with self.assertRaises(LockTimeout):
+                        with second.lock("edition-publication", timeout=0.3):
+                            pass
+                with second.lock("edition-publication", timeout=0.3):
+                    pass
+            finally:
+                first.close()
+                second.close()
+
+    def test_public_view_hides_withheld_and_internal_fields(self):
+        payload = apply_policy(validate(sample(), lambda url: True, excluded=set()), auto=True)
+        view = public_view(dict(payload, raw_hash="x", contribution_id="y"))
+        self.assertNotIn("withheld", view)
+        self.assertNotIn("raw_hash", view)
+        self.assertNotIn("invalid", view)
+
+
+class EditorialCliTests(unittest.TestCase):
+    def test_validate_and_inspect_need_no_database_or_ai(self):
+        import subprocess, sys
+        env = dict(os.environ, PYTHONPATH=str(Path(__file__).parents[1] / "src"), EDITORIAL_CATALOG=str(Path(__file__).parents[1] / "catalog/sources.json"))
+        raw = json.dumps(sample()).encode()
+        # Links are not reachable in CI; inspect must still report, not crash.
+        env["SOURCE_CHECK_CACHE"] = ""
+        code = ("import sys, prismunfold.editorial as e; e.http_status = lambda u: 'restricted';"
+                "e.SourceCheckCache.probe = lambda self, check=None: (lambda u: 'restricted'); sys.exit(e.main(sys.argv[1:]))")
+        out = subprocess.run([sys.executable, "-c", code, "inspect", "2026-11-24"], input=raw, env=env,
+                             capture_output=True, check=True)
+        found = json.loads(out.stdout)
+        self.assertTrue(found and all(p["reason"] == "only_restricted_sources" for p in found))
+
+
+if __name__ == "__main__":
+    unittest.main()

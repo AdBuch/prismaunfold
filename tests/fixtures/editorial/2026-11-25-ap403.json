@@ -1,0 +1,362 @@
+{
+ "publication": "morgenbriefing",
+ "provider": "codex",
+ "date": "2026-11-25",
+ "sources": [
+  {
+   "id": "admin",
+   "url": "https://www.admin.ch/gov/de/start/dokumentation/medienmitteilungen.html",
+   "title": "Medienmitteilungen des Bundesrates",
+   "publisher": "Bundesrat",
+   "access": "open"
+  },
+  {
+   "id": "parl",
+   "url": "https://www.parlament.ch/de/services/news",
+   "title": "News aus dem Parlament",
+   "publisher": "Parlament",
+   "access": "open"
+  },
+  {
+   "id": "gobpe",
+   "url": "https://www.gob.pe/institucion/pcm/noticias",
+   "title": "Noticias PCM",
+   "publisher": "Gobierno del Perú",
+   "access": "open"
+  },
+  {
+   "id": "un",
+   "url": "https://news.un.org/en/",
+   "title": "UN News",
+   "publisher": "United Nations",
+   "access": "open"
+  },
+  {
+   "id": "who",
+   "url": "https://www.who.int/news",
+   "title": "WHO News",
+   "publisher": "WHO",
+   "access": "open"
+  },
+  {
+   "id": "ap",
+   "url": "https://apnews.com/article/example-ukraine-energy-grid",
+   "title": "Energy grid under pressure",
+   "publisher": "AP News",
+   "access": "open"
+  },
+  {
+   "id": "eu",
+   "url": "https://commission.europa.eu/news_en",
+   "title": "Commission news",
+   "publisher": "European Commission",
+   "access": "open"
+  }
+ ],
+ "articles": [
+  {
+   "section": "Schweiz Politik",
+   "topic": "thema-0",
+   "headline": "Testmeldung 1: Schweiz Politik",
+   "lead": "Vorspann zur Meldung 1.",
+   "paragraphs": [
+    {
+     "heading": "",
+     "text": "Dieser Absatz 1 zum Thema Schweiz Politik beschreibt die belegte Entwicklung sachlich und ordnet ihre Folgen für Bevölkerung, Behörden und Wirtschaft ein mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der.",
+     "source_ids": [
+      "admin",
+      "parl"
+     ]
+    },
+    {
+     "heading": "",
+     "text": "Dieser Absatz 2 zum Thema Schweiz Politik beschreibt die belegte Entwicklung sachlich und ordnet ihre Folgen für Bevölkerung, Behörden und Wirtschaft ein mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der.",
+     "source_ids": [
+      "admin",
+      "parl"
+     ]
+    }
+   ],
+   "background": []
+  },
+  {
+   "section": "Schweiz Gesellschaft",
+   "topic": "thema-1",
+   "headline": "Testmeldung 2: Schweiz Gesellschaft",
+   "lead": "Vorspann zur Meldung 2.",
+   "paragraphs": [
+    {
+     "heading": "",
+     "text": "Dieser Absatz 1 zum Thema Schweiz Gesellschaft beschreibt die belegte Entwicklung sachlich und ordnet ihre Folgen für Bevölkerung, Behörden und Wirtschaft ein mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der.",
+     "source_ids": [
+      "admin"
+     ]
+    },
+    {
+     "heading": "",
+     "text": "Dieser Absatz 2 zum Thema Schweiz Gesellschaft beschreibt die belegte Entwicklung sachlich und ordnet ihre Folgen für Bevölkerung, Behörden und Wirtschaft ein mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der.",
+     "source_ids": [
+      "admin"
+     ]
+    }
+   ],
+   "background": []
+  },
+  {
+   "section": "Schweiz Regional",
+   "topic": "thema-2",
+   "headline": "Testmeldung 3: Schweiz Regional",
+   "lead": "Vorspann zur Meldung 3.",
+   "paragraphs": [
+    {
+     "heading": "",
+     "text": "Dieser Absatz 1 zum Thema Schweiz Regional beschreibt die belegte Entwicklung sachlich und ordnet ihre Folgen für Bevölkerung, Behörden und Wirtschaft ein mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der.",
+     "source_ids": [
+      "parl"
+     ]
+    },
+    {
+     "heading": "",
+     "text": "Dieser Absatz 2 zum Thema Schweiz Regional beschreibt die belegte Entwicklung sachlich und ordnet ihre Folgen für Bevölkerung, Behörden und Wirtschaft ein mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der.",
+     "source_ids": [
+      "parl"
+     ]
+    }
+   ],
+   "background": []
+  },
+  {
+   "section": "Peru Politik",
+   "topic": "thema-3",
+   "headline": "Testmeldung 4: Peru Politik",
+   "lead": "Vorspann zur Meldung 4.",
+   "paragraphs": [
+    {
+     "heading": "",
+     "text": "Dieser Absatz 1 zum Thema Peru Politik beschreibt die belegte Entwicklung sachlich und ordnet ihre Folgen für Bevölkerung, Behörden und Wirtschaft ein mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der.",
+     "source_ids": [
+      "gobpe"
+     ]
+    },
+    {
+     "heading": "",
+     "text": "Dieser Absatz 2 zum Thema Peru Politik beschreibt die belegte Entwicklung sachlich und ordnet ihre Folgen für Bevölkerung, Behörden und Wirtschaft ein mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der.",
+     "source_ids": [
+      "gobpe"
+     ]
+    }
+   ],
+   "background": []
+  },
+  {
+   "section": "Peru Gesellschaft",
+   "topic": "thema-4",
+   "headline": "Testmeldung 5: Peru Gesellschaft",
+   "lead": "Vorspann zur Meldung 5.",
+   "paragraphs": [
+    {
+     "heading": "",
+     "text": "Dieser Absatz 1 zum Thema Peru Gesellschaft beschreibt die belegte Entwicklung sachlich und ordnet ihre Folgen für Bevölkerung, Behörden und Wirtschaft ein mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der.",
+     "source_ids": [
+      "gobpe"
+     ]
+    },
+    {
+     "heading": "",
+     "text": "Dieser Absatz 2 zum Thema Peru Gesellschaft beschreibt die belegte Entwicklung sachlich und ordnet ihre Folgen für Bevölkerung, Behörden und Wirtschaft ein mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der.",
+     "source_ids": [
+      "gobpe"
+     ]
+    }
+   ],
+   "background": []
+  },
+  {
+   "section": "Krisen- und Konfliktgebiete",
+   "topic": "thema-5",
+   "headline": "Testmeldung 6: Krisen- und Konfliktgebiete",
+   "lead": "Vorspann zur Meldung 6.",
+   "paragraphs": [
+    {
+     "heading": "",
+     "text": "Dieser Absatz 1 zum Thema Krisen- und Konfliktgebiete beschreibt die belegte Entwicklung sachlich und ordnet ihre Folgen für Bevölkerung, Behörden und Wirtschaft ein mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus.",
+     "source_ids": [
+      "un",
+      "ap"
+     ]
+    },
+    {
+     "heading": "",
+     "text": "Dieser Absatz 2 zum Thema Krisen- und Konfliktgebiete beschreibt die belegte Entwicklung sachlich und ordnet ihre Folgen für Bevölkerung, Behörden und Wirtschaft ein mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus.",
+     "source_ids": [
+      "un",
+      "ap"
+     ]
+    }
+   ],
+   "background": []
+  },
+  {
+   "section": "Reisen",
+   "topic": "thema-6",
+   "headline": "Testmeldung 7: Reisen",
+   "lead": "Vorspann zur Meldung 7.",
+   "paragraphs": [
+    {
+     "heading": "",
+     "text": "Dieser Absatz 1 zum Thema Reisen beschreibt die belegte Entwicklung sachlich und ordnet ihre Folgen für Bevölkerung, Behörden und Wirtschaft ein mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle.",
+     "source_ids": [
+      "eu"
+     ]
+    },
+    {
+     "heading": "",
+     "text": "Dieser Absatz 2 zum Thema Reisen beschreibt die belegte Entwicklung sachlich und ordnet ihre Folgen für Bevölkerung, Behörden und Wirtschaft ein mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle.",
+     "source_ids": [
+      "eu"
+     ]
+    }
+   ],
+   "background": []
+  },
+  {
+   "section": "International",
+   "topic": "thema-7",
+   "headline": "Testmeldung 8: International",
+   "lead": "Vorspann zur Meldung 8.",
+   "paragraphs": [
+    {
+     "heading": "",
+     "text": "Dieser Absatz 1 zum Thema International beschreibt die belegte Entwicklung sachlich und ordnet ihre Folgen für Bevölkerung, Behörden und Wirtschaft ein mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle.",
+     "source_ids": [
+      "un"
+     ]
+    },
+    {
+     "heading": "",
+     "text": "Dieser Absatz 2 zum Thema International beschreibt die belegte Entwicklung sachlich und ordnet ihre Folgen für Bevölkerung, Behörden und Wirtschaft ein mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle.",
+     "source_ids": [
+      "un"
+     ]
+    }
+   ],
+   "background": []
+  },
+  {
+   "section": "Wirtschaft, Technologie & Wissenschaft",
+   "topic": "thema-8",
+   "headline": "Testmeldung 9: Wirtschaft, Technologie & Wissenschaft",
+   "lead": "Vorspann zur Meldung 9.",
+   "paragraphs": [
+    {
+     "heading": "",
+     "text": "Dieser Absatz 1 zum Thema Wirtschaft, Technologie & Wissenschaft beschreibt die belegte Entwicklung sachlich und ordnet ihre Folgen für Bevölkerung, Behörden und Wirtschaft ein mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten.",
+     "source_ids": [
+      "eu",
+      "who"
+     ]
+    },
+    {
+     "heading": "",
+     "text": "Dieser Absatz 2 zum Thema Wirtschaft, Technologie & Wissenschaft beschreibt die belegte Entwicklung sachlich und ordnet ihre Folgen für Bevölkerung, Behörden und Wirtschaft ein mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten.",
+     "source_ids": [
+      "eu",
+      "who"
+     ]
+    }
+   ],
+   "background": []
+  },
+  {
+   "section": "Good News",
+   "topic": "thema-9",
+   "headline": "Testmeldung 10: Good News",
+   "lead": "Vorspann zur Meldung 10.",
+   "paragraphs": [
+    {
+     "heading": "",
+     "text": "Dieser Absatz 1 zum Thema Good News beschreibt die belegte Entwicklung sachlich und ordnet ihre Folgen für Bevölkerung, Behörden und Wirtschaft ein mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der.",
+     "source_ids": [
+      "who"
+     ]
+    },
+    {
+     "heading": "",
+     "text": "Dieser Absatz 2 zum Thema Good News beschreibt die belegte Entwicklung sachlich und ordnet ihre Folgen für Bevölkerung, Behörden und Wirtschaft ein mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der.",
+     "source_ids": [
+      "who"
+     ]
+    }
+   ],
+   "background": []
+  }
+ ],
+ "magazine": {
+  "headline": "Das Stromnetz der Ukraine im zweiten Kriegswinter",
+  "lead": "Eine Vertiefung zur Energieversorgung.",
+  "paragraphs": [
+   {
+    "heading": "Ausgangslage",
+    "text": "Dieser Absatz 1 zum Thema Energie beschreibt die belegte Entwicklung sachlich und ordnet ihre Folgen für Bevölkerung, Behörden und Wirtschaft ein mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle und ihrer Bedeutung für den Winter und ihrer Bedeutung für den Winter und ihrer Bedeutung für den Winter und ihrer Bedeutung für den Winter.",
+    "source_ids": [
+     "un"
+    ]
+   },
+   {
+    "heading": "Angriffe auf das Netz",
+    "text": "Dieser Absatz 2 zum Thema Energie beschreibt die belegte Entwicklung sachlich und ordnet ihre Folgen für Bevölkerung, Behörden und Wirtschaft ein mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle und ihrer Bedeutung für den Winter und ihrer Bedeutung für den Winter und ihrer Bedeutung für den Winter und ihrer Bedeutung für den Winter.",
+    "source_ids": [
+     "ap"
+    ]
+   },
+   {
+    "heading": "Europäische Hilfe",
+    "text": "Dieser Absatz 3 zum Thema Energie beschreibt die belegte Entwicklung sachlich und ordnet ihre Folgen für Bevölkerung, Behörden und Wirtschaft ein mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle und ihrer Bedeutung für den Winter und ihrer Bedeutung für den Winter und ihrer Bedeutung für den Winter und ihrer Bedeutung für den Winter.",
+    "source_ids": [
+     "eu",
+     "un"
+    ]
+   },
+   {
+    "heading": "Offene Fragen",
+    "text": "Dieser Absatz 4 zum Thema Energie beschreibt die belegte Entwicklung sachlich und ordnet ihre Folgen für Bevölkerung, Behörden und Wirtschaft ein mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle mit weiteren Einzelheiten aus der Quelle und ihrer Bedeutung für den Winter und ihrer Bedeutung für den Winter und ihrer Bedeutung für den Winter und ihrer Bedeutung für den Winter.",
+    "source_ids": [
+     "un"
+    ]
+   }
+  ],
+  "background": []
+ },
+ "random": {
+  "text": "Cer ist in der Erdkruste häufiger als Kupfer.",
+  "source_ids": [
+   "eu"
+  ]
+ },
+ "lagebild": {
+  "Wichtig": {
+   "text": "Rohstoffversorgung.",
+   "source_ids": [
+    "eu"
+   ]
+  },
+  "Überschätzt": {
+   "text": "Neue Minen als schnelle Lösung.",
+   "source_ids": [
+    "eu"
+   ]
+  },
+  "Unterberichtet": {
+   "text": "Trinkwasserschutz.",
+   "source_ids": [
+    "gobpe"
+   ]
+  },
+  "Beobachten": {
+   "text": "Netzangriffe im Winter.",
+   "source_ids": [
+    "ap"
+   ]
+  }
+ }
+}
