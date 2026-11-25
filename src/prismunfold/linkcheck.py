@@ -38,32 +38,49 @@ def is_public_host(host: str) -> bool:
     return bool(addresses) and all(ipaddress.ip_address(a).is_global for a in addresses)
 
 
+class UnsafeRedirect(urllib.error.URLError):
+    pass
+
+
 class _NoRedirectToPrivate(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         parts = urlsplit(newurl)
         if parts.scheme not in ("http", "https") or not is_public_host(parts.hostname or ""):
-            raise urllib.error.URLError(f"redirect to non-public target {newurl!r}")
+            raise UnsafeRedirect("redirect to non-public target")
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
-def http_probe(url: str) -> bool:
-    """HEAD first, GET if the server refuses HEAD. Any 2xx counts as existing."""
+def http_status(url: str) -> str:
+    """Check accessibility, not truth; never bypass access controls."""
     parts = urlsplit(url)
     if parts.scheme not in ("http", "https") or not is_public_host(parts.hostname or ""):
-        return False
+        return "unsafe_or_unresolved"
     opener = urllib.request.build_opener(_NoRedirectToPrivate)
     for method in ("HEAD", "GET"):
         request = urllib.request.Request(url, method=method, headers={"User-Agent": USER_AGENT})
         try:
             with opener.open(request, timeout=TIMEOUT) as response:
-                return 200 <= response.status < 300
+                return "reachable" if 200 <= response.status < 300 else "unavailable"
         except urllib.error.HTTPError as exc:
             if method == "HEAD" and exc.code in (403, 405, 501):
-                continue  # some servers do not answer HEAD
-            return False
+                continue
+            if exc.code in (401, 402, 403, 451):
+                return "restricted"
+            if exc.code in (404, 410):
+                return "missing"
+            if exc.code == 429:
+                return "rate_limited"
+            return "unavailable"
+        except UnsafeRedirect:
+            return "unsafe_or_unresolved"
         except (urllib.error.URLError, OSError, ValueError):
-            return False
-    return False
+            return "unavailable"
+    return "unavailable"
+
+
+def http_probe(url: str) -> bool:
+    """Compatibility for the existing feed desk."""
+    return http_status(url) == "reachable"
 
 
 @dataclasses.dataclass(frozen=True)
