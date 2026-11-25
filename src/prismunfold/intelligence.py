@@ -232,14 +232,21 @@ class EditorialIntelligence:
                 raise ValueError("paragraph has missing or unrecognised claim references")
             paragraphs.append({"text": _require(paragraph.get("text"), "paragraph text"),
                                "claim_keys": sorted(set(used))})
+        uncertainties = raw.get("uncertainties") or []
+        if not isinstance(uncertainties, list):
+            raise ValueError("uncertainties must be a list")
+        variant = raw.get("article_variant", "standard_article")
+        if variant not in ("brief", "standard_article", "background", "perspectives",
+                           "longform_feature"):
+            raise ValueError("unknown article variant")
         draft = {
             "event_id": event_id, "language": _require(language, "language"),
             "headline": _require(raw.get("headline"), "headline"),
             "lead": _require(raw.get("lead"), "lead"),
             "paragraphs": paragraphs, "topics": dossier["topics"],
             "regions": dossier["regions"],
-            "uncertainties": [_require(x, "uncertainty") for x in raw.get("uncertainties", [])],
-            "article_variant": raw.get("article_variant", "standard_article"),
+            "uncertainties": [_require(x, "uncertainty") for x in uncertainties],
+            "article_variant": variant,
             "editorial_importance": raw.get("editorial_importance", "normal"),
             "source_document_ids": sorted({e["document_id"] for c in dossier["claims"]
                                           for e in c["evidence"]}),
@@ -264,7 +271,7 @@ class EditorialIntelligence:
         dossier = self.dossier(event_id)
         claims = {c["key"]: c for c in dossier["claims"]}
         used = {k for p in draft["paragraphs"] for k in p["claim_keys"]}
-        if set(checked_claim_sources) != used:
+        if not isinstance(checked_claim_sources, dict) or set(checked_claim_sources) != used:
             raise ValueError("every published claim requires explicit review")
         claim_status = {}
         for key, source_ids in checked_claim_sources.items():
@@ -273,11 +280,14 @@ class EditorialIntelligence:
                           if e["relation"] == "supports" and e["origin_type"] == "original_publisher"}
             contradicting = {e["document_id"] for e in evidence
                              if e["relation"] == "contradicts" and e["origin_type"] == "original_publisher"}
+            possible_contradiction = any(e["relation"] == "contradicts" for e in evidence)
+            if not isinstance(source_ids, list) or not all(isinstance(x, str) for x in source_ids):
+                raise ValueError(f"{key}: checked evidence IDs must be a list of strings")
             checked = set(source_ids)
             if not checked or not checked <= (supporting | contradicting) or not (checked & supporting):
                 raise ValueError(f"{key}: checked sources need original supporting locators")
-            if contradicting:
-                if not draft["uncertainties"] or not (checked & contradicting):
+            if possible_contradiction:
+                if not draft["uncertainties"] or (contradicting and not (checked & contradicting)):
                     raise ValueError(f"{key}: disputed claims require checked contradictions and disclosure")
                 claim_status[key] = "disputed_with_disclosure"
             else:
