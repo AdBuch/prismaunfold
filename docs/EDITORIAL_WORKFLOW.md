@@ -53,7 +53,8 @@ any revision replaced by a newer one → superseded
 | --- | --- | --- |
 | `validated` | Every paragraph has an openly reachable source | Upstream `published`/`final` |
 | `review_required` | A paragraph rests only on restricted, missing or temporarily unreachable sources | Upstream `draft`, `unverified`, `test_import_unverified` |
-| `rejected` | A paragraph rests only on unsafe or catalogue-excluded sources; or an operator rejected it | Operator rejected the revision |
+| `rejected` | A paragraph rests only on unsafe or catalogue-excluded sources (cannot be approved) | Operator rejected the revision |
+| `withdrawn` | An operator rejected a published article; `approve` reverses it | – |
 | `approved` / `published` | Published automatically (validated) or approved by an operator | Operator approved this exact content hash |
 | `superseded` | Replaced by `--replace` | Replaced by a newer revision, or arrived older than the stored one |
 
@@ -98,7 +99,7 @@ page supports the claim; a 403 does not show the source is invented.
 | `unsafe` | Non-http(s), credentials in URL, literal IP, non-public address, unsafe redirect, too many redirects | no |
 | `unknown` | Not checked | – |
 
-Retries: 3 attempts, exponential backoff 1 s, 2 s (max 8 s). Results are cached per
+Retries: 3 attempts, exponential backoff 1 s, 2 s (max 8 s); a hard limit of 30 s per URL over all attempts and redirects. Results are cached per
 cycle (definitive 6 h, transient 15 min; file cache via `SOURCE_CHECK_CACHE`).
 Publisher refusals are respected: no cookies, no credentials, no paywall or anti-bot
 circumvention.
@@ -107,7 +108,7 @@ circumvention.
 resolve only to public addresses. The connection is pinned to the vetted address,
 so the HTTP client cannot resolve the name again to an internal address (DNS
 rebinding). Remaining limitations: the check connects directly (no proxy support);
-TLS is verified against the original host name; a public address that forwards to
+TLS is verified against the original host name; only the first resolved address is tried; NAT64 prefixes count as public; a public address that forwards to
 internal services is outside this check, so run the pipeline where internal services
 are not reachable anyway (own container network).
 

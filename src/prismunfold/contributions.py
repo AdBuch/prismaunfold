@@ -28,7 +28,7 @@ from datetime import datetime, timezone
 
 PROVIDERS = ("rss", "prism-data", "chatgpt", "codex", "claude", "mistral", "goose", "other")
 STATES = ("received", "normalised", "validated", "review_required", "approved", "published",
-          "rejected", "superseded")
+          "rejected", "withdrawn", "superseded")
 PUBLIC_STATES = frozenset({"approved", "published"})
 # How a contribution relates to the facts it reports.
 ORIGIN_TYPES = ("original_publisher", "ai_secondary", "editorial_synthesis")

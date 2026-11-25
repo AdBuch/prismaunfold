@@ -120,6 +120,20 @@ class ClassificationTests(unittest.TestCase):
         self.assertEqual(result.status, "unsafe")
         self.assertLessEqual(len(calls), linkcheck.MAX_REDIRECTS + 1)
 
+    def test_slow_drip_server_is_cut_off_by_the_deadline(self):
+        import time as _time
+        from unittest.mock import patch
+
+        def tarpit(method, url, address, timeout):
+            _time.sleep(5)
+            return 200, ""
+        with patch.object(linkcheck, "_request", tarpit):
+            started = _time.monotonic()
+            result = check_source("https://www.admin.ch/slow", transport=linkcheck._bounded(tarpit, _time.monotonic() + 0.3),
+                                  resolver=PUBLIC, sleep=lambda s: None, attempts=3)
+        self.assertEqual(result.status, "timeout")
+        self.assertLess(_time.monotonic() - started, 2)
+
     def test_legacy_probe_helpers(self):
         self.assertFalse(linkcheck.http_probe("http://127.0.0.1:8080/admin"))
         self.assertFalse(linkcheck.is_public_host("localhost"))

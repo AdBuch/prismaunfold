@@ -129,6 +129,10 @@ class PostgresStore:
         finally:
             held[name] = 0
             # Advisory unlock is not transactional; the caller decides commit or rollback.
+            # A failed transaction must be rolled back first, or the unlock itself would
+            # fail and hide the original error (and keep the lock until disconnect).
+            if self.db.info.transaction_status == psycopg.pq.TransactionStatus.INERROR:
+                self.db.rollback()
             self.db.execute("SELECT pg_advisory_unlock(hashtext(%s))", (name,))
 
     def close(self) -> None:

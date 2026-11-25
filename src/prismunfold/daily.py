@@ -60,7 +60,8 @@ def _article(a: dict, fallback_id: str) -> dict:
         perspectives=[dict(text=x["text"], label=x.get("label") or None, attribution=x.get("attribution") or None,
                            sources=[_source(s) for s in x.get("sources", [])]) for x in a.get("perspectives", [])],
         uncertainties=list(a.get("uncertainties", [])),
-        background=[dict(heading=b.get("heading"), text=b["text"], sources=[_source(s) for s in b.get("sources", [])])
+        background=[dict(heading=b.get("heading"), text=b["text"], reviewRequired=bool(b.get("review_required")),
+                         sources=[_source(s) for s in b.get("sources", [])])
                     for b in a.get("background", [])],
         reviewRequired=bool(a.get("review_required")),
         limitations=list(a.get("limitations", [])),

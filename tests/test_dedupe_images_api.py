@@ -79,9 +79,10 @@ class ImageTests(unittest.TestCase):
         self.assertTrue(shown["display"])
         self.assertIn(AI_LABEL, shown["caption"])
 
-    def test_unsafe_image_url_is_rejected(self):
-        with self.assertRaises(ValueError):
-            image_metadata(dict(url="javascript:alert(1)"))
+    def test_unsafe_or_missing_image_url_is_rejected(self):
+        for raw in (dict(url="javascript:alert(1)"), dict(credit="x"), dict(url=None), dict(url=7)):
+            with self.assertRaises(ValueError):
+                image_metadata(raw)
 
 
 class LoggingTests(unittest.TestCase):

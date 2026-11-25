@@ -49,6 +49,8 @@ def image_metadata(raw) -> dict:
     if not isinstance(raw, dict):
         raise ValueError("image must be an object")
     url = raw.get("url") or raw.get("image_url")
+    if not isinstance(url, str) or not url.strip():
+        raise ValueError("invalid HTTP(S) image URL: missing")
     _link(url)
     url = url.strip()  # keep signed image URLs byte-for-byte
     rights = raw.get("rights")

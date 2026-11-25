@@ -137,6 +137,27 @@ class EditorialValidationTests(unittest.TestCase):
         payload = validate(sample(), lambda url: "unsafe_or_unresolved", excluded=set())
         self.assertTrue(all(a["state"] == "rejected" for a in payload["articles"]))
 
+    def test_rejected_short_items_and_unchecked_background_are_never_published(self):
+        raw = sample()
+        raw["sources"].append({"id": "c", "url": "https://intranet.example.net/x", "publisher": "X", "title": "X"})
+        raw["sources"].append({"id": "d", "url": "https://apnews.com/x", "publisher": "AP", "title": "AP"})
+        raw["random"] = {"text": "Fakt", "source_ids": ["c"]}
+        raw["articles"][0]["background"] = [{"heading": "H", "text": "Nur AP", "source_ids": ["d"]}]
+        probe = lambda u: "unsafe" if "intranet" in u else "restricted" if "apnews" in u else "reachable"
+        payload = validate(raw, probe, excluded=set())
+        manual = apply_policy(payload, auto=False, approve_review_required=True)
+        self.assertNotIn("random", manual)
+        auto = apply_policy(payload, auto=True)
+        first = next(a for a in auto["articles"] if a["headline"] == "Schweiz Politik")
+        self.assertEqual(first["background"], [])
+
+    def test_untrusted_generated_at_is_normalised(self):
+        from prismunfold.editorial import _timestamp
+        self.assertIsNone(_timestamp({"x": 1}))
+        self.assertIsNone(_timestamp("yesterday"))
+        self.assertIsNone(_timestamp("2026-11-25T06:00:00"))
+        self.assertEqual(_timestamp("2026-11-25T06:00:00Z"), "2026-11-25T06:00:00+00:00")
+
     def test_partial_edition_policy(self):
         raw = sample()
         payload = validate(raw, lambda url: "admin.ch" not in url and "un.org" not in url, excluded=set())
@@ -180,9 +201,11 @@ class AP403RegressionTest(unittest.TestCase):
                 self.assertTrue(edition["magazine"]["review_required"])
                 exported = json.loads((Path(tmp) / "api/v1/editorial/morgenbriefing.json").read_text())
                 self.assertEqual(exported[0]["magazine"]["headline"], payload["magazine"]["headline"])
-                review_article(store, "2026-11-25", magazine_id, "reject", "Adrian", site_dir=tmp)
-                with self.assertRaisesRegex(ValueError, "cannot be approved"):
-                    review_article(store, "2026-11-25", magazine_id, "approve", "Adrian", site_dir=tmp)
+                edition = review_article(store, "2026-11-25", magazine_id, "reject", "Adrian", site_dir=tmp)
+                self.assertEqual(edition["withheld"][-1]["state"], "withdrawn")
+                # A reviewer's reject can be reversed; an unsafe-source rejection cannot.
+                edition = review_article(store, "2026-11-25", magazine_id, "approve", "Adrian", site_dir=tmp)
+                self.assertTrue(edition["magazine"]["review_required"])
             finally:
                 store.close()
 

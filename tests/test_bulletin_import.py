@@ -284,3 +284,12 @@ class MergeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ImageFailureTests(unittest.TestCase):
+    def test_image_without_url_is_an_import_error_not_a_crash(self):
+        raw = document(publication_status="published")
+        raw["sections"][0]["items"][0]["images"] = [{"credit": "x"}]
+        with self.assertRaises(BulletinError) as ctx:
+            validate(raw, DAY)
+        self.assertEqual(ctx.exception.code, "invalid_document")

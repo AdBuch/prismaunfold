@@ -328,6 +328,8 @@ def _warnings(payload) -> list[str]:
             out.append("Prüfbedürftig: " + a["headline"])
         elif a["state"] == "rejected":
             out.append("Zurückgewiesen (unsichere oder ausgeschlossene Quelle): " + a["headline"])
+        elif a["state"] == "withdrawn":
+            out.append("Zurückgezogen: " + a["headline"])
     covered = {a["section"] for a in payload["articles"] if a["state"] in ("validated", "approved", "published")}
     missing = [section for section in SECTIONS if section not in covered]
     if missing:
@@ -380,11 +382,15 @@ def apply_policy(payload: dict, *, auto: bool, approve_review_required: bool = F
         out["magazine"] = None
         if magazine:
             withheld.append(magazine)
-    for key in ("random",):
-        if out.get(key) and out[key]["state"] != "validated" and (auto or not approve_review_required):
-            out.pop(key)
-    out["lagebild"] = [x for x in payload.get("lagebild", [])
-                       if x["state"] == "validated" or (x["state"] == "review_required" and approve_review_required and not auto)]
+    def allowed(item):
+        return item["state"] == "validated" or (item["state"] == "review_required" and approve_review_required and not auto)
+
+    if out.get("random") and not allowed(out["random"]):
+        out.pop("random")
+    # Background inside a published article follows the same rule as the article's paragraphs.
+    for a in publish:
+        a["background"] = [b for b in a.get("background", []) if allowed(b)]
+    out["lagebild"] = [x for x in payload.get("lagebild", []) if allowed(x)]
     out["completeness"] = "complete" if out["magazine"] and out.get("random") and len(out["lagebild"]) == len(ASSESSMENTS) else "partial"
     out["publication"] = PUBLICATION
     out["published_at"] = stamp
@@ -430,6 +436,17 @@ def _site():
     return os.environ.get("SITE_DIR", "/site")
 
 
+def _timestamp(value) -> str | None:
+    """An untrusted timestamp as ISO 8601 with zone, or None."""
+    if not isinstance(value, str) or len(value) > 64:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return parsed.isoformat() if parsed.utcoffset() is not None else None
+
+
 def publish(store, raw: dict, payload: dict, *, auto: bool, approve_review_required=False, allow_partial=False,
             replace=False, policy=None, reviewer="", site_dir=None) -> tuple[str, dict]:
     """Store and export an edition. Safe to retry: identical content only re-exports."""
@@ -447,7 +464,7 @@ def publish(store, raw: dict, payload: dict, *, auto: bool, approve_review_requi
             result = apply_policy(payload, auto=auto, approve_review_required=approve_review_required,
                                   allow_partial=allow_partial, policy=policy, reviewer=reviewer)
             record = contrib.new(payload["provider"], source_key, day, digest,
-                                 generated_at=raw.get("generated_at"), kind="edition", raw=raw,
+                                 generated_at=_timestamp(raw.get("generated_at")), kind="edition", raw=raw,
                                  normalised=None, state="validated")
             if not store.save_contribution(record):
                 record = next(c for c in store.list_contributions(source_key=source_key) if c["content_hash"] == digest)
@@ -483,7 +500,8 @@ def review_article(store, day: str, article_ref: str, decision: str, reviewer: s
             require(match is not None, "Article is not withheld")
             require(match["state"] != "rejected", "Rejected articles (unsafe or excluded sources) cannot be approved")
             withheld.remove(match)
-            match = dict(match, state="published", review_required=match["state"] == "review_required",
+            needs_label = match["state"] == "review_required" or bool(match.get("review_required"))
+            match = dict(match, state="published", review_required=needs_label,
                          approval=dict(by=reviewer, at=stamp, note=note))
             if match["kind"] == "magazine":
                 require(not edition.get("magazine"), "Edition already has a magazine")
@@ -499,7 +517,8 @@ def review_article(store, day: str, article_ref: str, decision: str, reviewer: s
                 edition["magazine"] = None
             else:
                 edition["articles"].remove(match)
-            withheld.append(dict(match, state="rejected", rejection=dict(by=reviewer, at=stamp, note=note)))
+            # "withdrawn" (not "rejected"): a reviewer's decision can be reversed by approve.
+            withheld.append(dict(match, state="withdrawn", rejection=dict(by=reviewer, at=stamp, note=note)))
         store.save_edition(EDITION_PREFIX + day, "de", datetime.now(timezone.utc), edition)
         store.commit()
         export_editorial(store, site_dir or _site())

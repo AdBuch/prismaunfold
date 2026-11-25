@@ -18,8 +18,7 @@ exec 8>"$base/.scheduled.lock"
 flock -w 120 8 || { echo "Another scheduled editorial run holds the lock" >&2; exit 1; }
 ready="$base/$day.ready"
 
-editorial() { docker compose run --rm --no-deps -T "${extra[@]}" --entrypoint python3 pipeline -m prismunfold.editorial "$@"; }
-extra=()
+editorial() { docker compose run --rm --no-deps -T --entrypoint python3 pipeline -m prismunfold.editorial "$@"; }
 
 if editorial status "$day" </dev/null >/dev/null 2>&1; then
   echo "Today's edition is already published"
@@ -48,11 +47,15 @@ case "${1:-}" in
     fi
     # Recover a saved raw edition before spending any model tokens. The choice is
     # deterministic (most usable articles, then magazine, then newest), see select_candidate.
-    extra=(-v "$base:/editorial:ro")
-    candidate=$(editorial select-candidate "$day" /editorial </dev/null || true)
-    extra=()
-    if [[ -n $candidate ]]; then
-      report="$base/${candidate#/editorial/}"
+    # Runs with the host Python (standard library only): the run files are private to
+    # this user (umask 077), so the container user could not read them.
+    set +e
+    candidate=$(PYTHONPATH=src python3 -m prismunfold.editorial select-candidate "$day" "$base" </dev/null)
+    found=$?
+    set -e
+    if ((found > 1)); then echo "Candidate selection failed (exit $found)" >&2; exit 1; fi
+    if [[ $found == 0 && -n $candidate ]]; then
+      report=$candidate
       [[ $report == "$base/$day."*/edition*.json && -s $report ]]
       stage "$report"
       echo "Recovered staged edition: $report"

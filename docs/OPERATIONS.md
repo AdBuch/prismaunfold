@@ -150,8 +150,7 @@ bash scripts/editorial.sh --publish-existing $E/2026-11-25.7IyLAC/edition.json \
   --approve-review-required --allow-partial --reviewer adrian
 
 # 24 Nov: two candidates; choose explicitly, or let the selector choose deterministically
-docker compose run --rm --no-deps -T -v "$E:/editorial:ro" --entrypoint python3 pipeline \
-  -m prismunfold.editorial select-candidate 2026-11-24 /editorial
+PYTHONPATH=src python3 -m prismunfold.editorial select-candidate 2026-11-24 "$E"   # host Python 3.11+, stdlib only
 bash scripts/editorial.sh --publish-existing $E/2026-11-24.zIa6G9/edition.repaired.json
 #   (if 24 Nov is already published with other content: add --replace; the old version is kept as superseded)
 

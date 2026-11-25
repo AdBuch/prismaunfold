@@ -35,6 +35,7 @@ import json
 import os
 import socket
 import ssl
+import threading
 import time
 from pathlib import Path
 from typing import Callable
@@ -48,6 +49,8 @@ MAX_REDIRECTS = 5
 ATTEMPTS = 3
 BACKOFF = 1.0
 MAX_BACKOFF = 8.0
+# Hard limit per URL over all attempts, hops and methods (a slow-drip server cannot stall a run).
+DEADLINE = 30.0
 
 REACHABLE, RESTRICTED, MISSING = "reachable", "restricted", "missing"
 RATE_LIMITED, UNAVAILABLE, TIMEOUT_STATUS = "rate_limited", "unavailable", "timeout"
@@ -165,6 +168,30 @@ def _classify(code: int) -> str:
     return UNAVAILABLE
 
 
+def _bounded(transport, deadline: float):
+    """Run each request in a daemon thread and stop waiting at the deadline."""
+    def send(method, url, address, timeout):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("check deadline reached")
+        result = {}
+
+        def run():
+            try:
+                result["value"] = transport(method, url, address, min(timeout, remaining))
+            except BaseException as exc:  # handed back to the caller below
+                result["error"] = exc
+        worker = threading.Thread(target=run, daemon=True)
+        worker.start()
+        worker.join(remaining)
+        if worker.is_alive():
+            raise TimeoutError("check deadline reached")
+        if "error" in result:
+            raise result["error"]
+        return result["value"]
+    return send
+
+
 def _once(url: str, transport, resolver, timeout: float) -> SourceCheck:
     current = url
     for _hop in range(MAX_REDIRECTS + 1):
@@ -197,9 +224,12 @@ def _once(url: str, transport, resolver, timeout: float) -> SourceCheck:
 
 
 def check_source(url: str, *, transport=_request, resolver=socket.getaddrinfo, sleep=time.sleep,
-                 attempts: int = ATTEMPTS, backoff: float = BACKOFF, timeout: float = TIMEOUT) -> SourceCheck:
+                 attempts: int = ATTEMPTS, backoff: float = BACKOFF, timeout: float = TIMEOUT,
+                 deadline: float = DEADLINE) -> SourceCheck:
     """Check one URL with bounded retries and exponential backoff for transient results."""
     result = SourceCheck(url, UNKNOWN)
+    if transport is _request:
+        transport = _bounded(transport, time.monotonic() + deadline)
     for attempt in range(1, max(1, attempts) + 1):
         result = dataclasses.replace(_once(url, transport, resolver, timeout), attempts=attempt)
         # 5xx and timeouts may clear; other "unavailable" causes (TLS, 4xx) are retried too,
