@@ -1,0 +1,13 @@
+[Unit]
+Description=Publish today's validated PrismUnfold morning edition
+After=docker.service unfold-editorial-generate.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=adrian
+WorkingDirectory=/opt/unfold
+Environment=HOME=/home/adrian
+UMask=0077
+ExecStart=/bin/bash /opt/unfold/scripts/editorial-scheduled.sh publish
+TimeoutStartSec=15min

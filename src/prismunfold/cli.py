@@ -1,0 +1,273 @@
+"""Command line.
+
+    prismunfold run      build one feed-based edition (ingest, cluster, summarise, export JSON)
+    prismunfold context  write the archive's prior coverage of a topic for the collector agents
+    prismunfold plan     write the job list and prior coverage for the collector containers
+    prismunfold reports  check the collector agents' reports, store, index and export them
+    prismunfold status   summarise how the collectors' jobs went
+    prismunfold import-bulletin   import the prism-data morning bulletin (see docs/PRISM_DATA.md)
+"""
+
+from __future__ import annotations
+
+import argparse
+import dataclasses
+import json
+import os
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+from .archive import prior_coverage
+from .edition import agent_edition
+from .export import export_site
+from .ingest import fetch_feed
+from .linkcheck import check_story
+from .verification import verify_story
+from .models import Source
+from .plan import job_status, load_topics, write_plan
+from .pipeline import load_catalog, load_config, run
+from .reports import load_reports
+from .storage import open_store
+
+
+def _parse_now(value: str | None) -> datetime:
+    if not value:
+        return datetime.now(timezone.utc)
+    parsed = datetime.fromisoformat(value)
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def _fixture_fetcher(directory: str):
+    def fetch(source: Source) -> bytes:
+        return (Path(directory) / f"{source.id}.xml").read_bytes()
+
+    return fetch
+
+
+def _open(args: argparse.Namespace, cfg: dict):
+    """--db wins, then the DATABASE_URL environment variable, then db_path from the config."""
+    return open_store(args.db or os.environ.get("DATABASE_URL") or cfg["db_path"])
+
+
+def _run(args: argparse.Namespace, cfg: dict) -> int:
+    catalog = load_catalog(args.catalog or cfg["catalog_path"])
+    fetch = _fixture_fetcher(args.fixtures) if args.fixtures else fetch_feed
+    store = _open(args, cfg)
+    try:
+        report = run(cfg, catalog, _parse_now(args.now), fetch, store, args.site or cfg["site_dir"])
+    finally:
+        store.close()
+
+    print(
+        f"fetched={report.fetched} kept={report.kept} events={report.events} "
+        f"stories_written={report.stories} dropped_sentences={report.dropped_sentences} "
+        f"languages={','.join(report.editions) or 'none'}"
+    )
+    for title, reason in report.dropped:
+        print(f"  dropped: {title!r} ({reason})")
+    for error in report.errors:
+        print(f"  error: {error}")
+    return 0
+
+
+def _context(args: argparse.Namespace, cfg: dict) -> int:
+    store = _open(args, cfg)
+    try:
+        text = prior_coverage(store, args.topic, args.language, args.limit)
+    finally:
+        store.close()
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(text, encoding="utf-8")
+    print(f"context: {'no prior coverage' if not text else f'{len(text)} characters'} -> {out}")
+    return 0
+
+
+def _plan(args: argparse.Namespace, cfg: dict) -> int:
+    if not Path(args.topics).exists():
+        print(f"plan: no topics file at {args.topics}; nothing for the collectors to do")
+        return 0
+    jobs = load_topics(args.topics)
+    edition = agent_edition(_parse_now(args.now))
+    store = _open(args, cfg)
+    try:
+        path = write_plan(store, jobs, edition, args.shared_dir, cfg.get("agents"), args.reports_dir)
+    finally:
+        store.close()
+    print(f"plan: edition={edition} topics={len(jobs)} -> {path}")
+    return 0
+
+
+def _status(args: argparse.Namespace, cfg: dict) -> int:
+    """Print how the collectors' jobs went: per agent done / retrying / failed, tries and time."""
+    now = _parse_now(args.now)
+    edition = agent_edition(now) if args.edition == "current" else args.edition
+    summary = job_status(args.reports_dir, edition)
+    if args.json:
+        print(json.dumps(summary, indent=1))
+        return 0
+    print(f"status: edition={edition} jobs={len(summary['jobs'])}")
+    for agent, c in sorted(summary["agents"].items()):
+        print(
+            f"  {agent}: done={c['done']} retrying={c['retrying']} failed={c['failed']} "
+            f"attempts={c['attempts']} seconds={c['seconds']}"
+        )
+    return 0
+
+
+def _reports(args: argparse.Namespace, cfg: dict) -> int:
+    """Exit code 1 when at least one report was rejected, so a scheduler notices."""
+    now = _parse_now(args.now)
+    if args.edition == "current":
+        editions: list[str | None] = [agent_edition(now)]
+    elif args.edition == "recent":  # a report may arrive after its edition has ended
+        editions = [agent_edition(now - timedelta(hours=6)), agent_edition(now)]
+    else:
+        editions = [args.edition]
+    results = [r for edition in editions for r in load_reports(args.reports_dir, edition, now)]
+    store = _open(args, cfg)
+    accepted = rejected = known = 0
+    try:
+        for path, story, problems in results:
+            if story is not None and not args.force and store.has_story(story.id):
+                known += 1  # already checked and published; do not probe its links again
+                continue
+            # Sentences already lost for lack of a usable source count against the story.
+            dropped = sum("dropped" in p and p.startswith("sentence") for p in problems)
+            reachable = None
+            dead = 0
+            if story is not None and args.check_links:
+                check = check_story(story)
+                story, reachable = check.story, check.reachable
+                dropped += check.dropped_sentences
+                dead = sum(not ok for ok in check.reachable.values())
+                problems = problems + check.problems
+                if story is not None:  # only reachable sources are left on the story
+                    reachable = {u: True for s in story.sentences for u in s.source_urls}
+            if story is None:
+                rejected += 1
+            else:
+                accepted += 1
+                record = verify_story(story, reachable, dropped_sentences=dropped, dead_sources=dead)
+                store.save_story(dataclasses.replace(story, verification=record))
+            for problem in problems:
+                print(f"  {path}: {problem}")
+        store.commit()
+        written = export_site(store, args.site or cfg["site_dir"], now)
+    finally:
+        store.close()
+    print(
+        f"reports: accepted={accepted} already_known={known} rejected={rejected} "
+        f"files_written={len(written)}"
+    )
+    return 1 if rejected else 0
+
+
+def _import_bulletin(args: argparse.Namespace, cfg: dict) -> int:
+    """Import prism-data bulletins. Never fatal for the pipeline: errors return 1 and are logged."""
+    from .bulletin import BulletinError, import_day, import_document, import_range, review_bulletin
+    from .editorial import export_editorial
+    from .oplog import setup
+
+    setup()
+    store = _open(args, cfg)
+    site = args.site or cfg["site_dir"]
+    try:
+        if args.review:
+            review_bulletin(store, args.date, args.review, args.reviewer or "", args.note or "")
+            export_editorial(store, site)
+            return 0
+        if args.file:
+            with store.lock("edition-publication"):
+                outcome = import_document(store, args.date, Path(args.file).read_bytes())
+            print(f"prism-data {args.date}: {outcome}")
+            export_editorial(store, site)
+            return 0
+        if args.date_from:
+            results = import_range(store, args.secret_file, args.date_from, args.date_to or args.date_from)
+            for day, outcome in results.items():
+                print(f"prism-data {day}: {outcome}")
+            export_editorial(store, site)
+            return 1 if any(v.startswith("failed") for v in results.values()) else 0
+        outcome = import_day(store, args.secret_file, _parse_now(args.now), args.date)
+        if outcome == "imported" or args.date:
+            export_editorial(store, site)
+    except BulletinError:
+        return 1  # already logged as import_failed with its error_code
+    except (ValueError, OSError) as error:
+        # Never print document content or the token; the importer redacts its own errors.
+        from .oplog import event
+
+        event("bulletin", "import_failed", level=40, error_code=type(error).__name__, reason=str(error)[:300])
+        return 1
+    finally:
+        store.close()
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="prismunfold", description="Build PrismUnfold editions.")
+    sub = parser.add_subparsers(dest="command", required=True)
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--config", default="config/config.json")
+    common.add_argument("--db", help="SQLite file or postgresql:// URL (default: $DATABASE_URL, then config)")
+    common.add_argument("--site", help="override site_dir from the config")
+
+    run_cmd = sub.add_parser("run", parents=[common], help="ingest feeds and export one edition")
+    run_cmd.add_argument("--catalog", help="override catalog_path from the config")
+    run_cmd.add_argument("--fixtures", help="read DIR/<source-id>.xml instead of the network")
+    run_cmd.add_argument("--now", help="ISO 8601 time to build for (default: current time)")
+
+    ctx_cmd = sub.add_parser("context", parents=[common], help="write prior coverage of a topic")
+    ctx_cmd.add_argument("--topic", required=True)
+    ctx_cmd.add_argument("--language")
+    ctx_cmd.add_argument("--limit", type=int, default=5)
+    ctx_cmd.add_argument("--out", required=True, help="markdown file to write (empty if nothing found)")
+
+    plan_cmd = sub.add_parser("plan", parents=[common], help="write jobs and context for the collectors")
+    plan_cmd.add_argument("--topics", default="config/topics.txt")
+    plan_cmd.add_argument("--shared-dir", default="collectors/shared")
+    plan_cmd.add_argument("--now", help="ISO 8601 time to plan for (default: current time)")
+    plan_cmd.add_argument("--reports-dir", help="collectors' output; used to see which agents are alive")
+
+    status_cmd = sub.add_parser("status", parents=[common], help="summarise the collectors' job status")
+    status_cmd.add_argument("--reports-dir", default="collectors/out")
+    status_cmd.add_argument("--edition", default="current")
+    status_cmd.add_argument("--now", help="ISO 8601 time that defines the current edition")
+    status_cmd.add_argument("--json", action="store_true")
+
+    rep_cmd = sub.add_parser("reports", parents=[common], help="check, store and export agent reports")
+    rep_cmd.add_argument("--reports-dir", default="collectors/out")
+    rep_cmd.add_argument("--edition", help="only this edition; 'current', or 'recent' for current and previous (default: all)")
+    rep_cmd.add_argument("--now", help="ISO 8601 time to judge report age against (default: now)")
+    rep_cmd.add_argument("--force", action="store_true", help="re-check reports that are already stored")
+    rep_cmd.add_argument(
+        "--check-links",
+        action="store_true",
+        help="open every cited URL; drop sources that do not answer (needs network)",
+    )
+
+    bulletin_cmd = sub.add_parser("import-bulletin", parents=[common], help="import a private GitHub morning bulletin")
+    bulletin_cmd.add_argument("--secret-file", default=os.environ.get("PRISM_DATA_TOKEN_FILE", "/run/secrets/prism_data_token"))
+    bulletin_cmd.add_argument("--date", help="import this YYYY-MM-DD now (manual import)")
+    bulletin_cmd.add_argument("--from", dest="date_from", help="backfill from YYYY-MM-DD ...")
+    bulletin_cmd.add_argument("--to", dest="date_to", help="... to YYYY-MM-DD (inclusive)")
+    bulletin_cmd.add_argument("--file", help="import a local bulletin file for --date (no GitHub access)")
+    bulletin_cmd.add_argument("--review", choices=["approved", "rejected"],
+                              help="record an operator decision on the stored revision of --date")
+    bulletin_cmd.add_argument("--reviewer", help="name of the reviewing person (with --review)")
+    bulletin_cmd.add_argument("--note", help="review note (with --review)")
+    bulletin_cmd.add_argument("--now", help="override the clock for testing")
+
+    args = parser.parse_args(argv)
+    if args.command == "import-bulletin" and (args.file or args.review) and not args.date:
+        parser.error("--file and --review need --date")
+    if args.command == "import-bulletin" and args.review and not args.reviewer:
+        parser.error("--review needs --reviewer")
+    cfg = load_config(args.config)
+    return {"run": _run, "context": _context, "plan": _plan, "status": _status, "reports": _reports,
+            "import-bulletin": _import_bulletin}[args.command](args, cfg)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

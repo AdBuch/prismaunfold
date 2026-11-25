@@ -1,0 +1,31 @@
+[
+  {
+    "id": "demo-rss",
+    "name": "Demo Zeitung (RSS)",
+    "feed_url": "https://example.org/rss.xml",
+    "languages": ["de"],
+    "rights": "excerpt_only",
+    "status": "active",
+    "ai_policy": "exclude",
+    "regions": ["CH"],
+    "topics": ["politik"]
+  },
+  {
+    "id": "demo-atom",
+    "name": "Demo Agentur (Atom)",
+    "feed_url": "https://example.net/atom.xml",
+    "languages": ["de"],
+    "rights": "full_text",
+    "status": "active",
+    "ai_policy": "exclude",
+    "topics": ["wirtschaft"]
+  },
+  {
+    "id": "demo-blocked",
+    "name": "Gesperrte Quelle",
+    "feed_url": "https://example.com/blocked.xml",
+    "languages": ["en"],
+    "rights": "link_only",
+    "status": "blocked"
+  }
+]

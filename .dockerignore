@@ -1,0 +1,9 @@
+.git
+**/node_modules
+**/dist
+site
+data
+collectors/out
+.env
+**/.env
+**/__pycache__

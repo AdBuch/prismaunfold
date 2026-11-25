@@ -1,0 +1,14 @@
+data/
+site/
+__pycache__/
+*.egg-info/
+collectors/out/
+collectors/context/
+.env
+config/topics.txt
+collectors/shared/
+node_modules/
+dist/
+*.log
+frontend/dist/
+frontend/node_modules/

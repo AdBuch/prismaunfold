@@ -1,0 +1,137 @@
+# PrismUnfold: every component in its own container.
+#
+#   cp .env.example .env                              # add at least one agent's credentials
+#   cp config/topics.example.txt config/topics.txt    # choose the topics
+#   docker compose up --build -d
+#   open http://localhost:8080
+#
+# pipeline   plans each 6-hour edition, checks the agents' reports, reads the feeds,
+#            keeps the archive, composes the daily edition and exports JSON
+# codex, claude, vibe, goose
+#            one writer each; works through the topics assigned to it.
+#            An agent without credentials in .env logs that and stays idle.
+# db         PostgreSQL: stories, archive search index, feed articles, frozen editions
+# web        the newspaper frontend plus the exported JSON, on port 8080
+#
+# Containers talk only through volumes:
+#   shared   pipeline -> collectors   job list and prior coverage     (collectors: read-only)
+#   reports  collectors -> pipeline   reports and job status           (pipeline: read-only)
+#   site     pipeline -> web          exported JSON                    (web: read-only)
+#   pgdata   db only                  PostgreSQL data
+# Only the pipeline talks to the database; it is not published on a host port.
+
+x-hardening: &hardening
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  pids_limit: 256
+
+x-collector: &collector
+  <<: *hardening
+  env_file: .env
+  environment:
+    WORKER_INTERVAL: ${WORKER_INTERVAL:-300}
+  entrypoint: ["/opt/collector/worker.sh"]
+  volumes:
+    - reports:/out
+    - shared:/shared:ro
+  depends_on:
+    volumes-init:
+      condition: service_completed_successfully
+  mem_limit: 2g
+  cpus: 1.5
+  restart: on-failure
+
+services:
+  # Named volumes start out owned by root; the services run as unprivileged users.
+  volumes-init:
+    image: busybox:stable
+    command: ["sh", "-c", "mkdir -p /out/_agents && chmod 1777 /out /out/_agents && chown 1000:1000 /site /shared"]
+    volumes:
+      - reports:/out
+      - site:/site
+      - shared:/shared
+    restart: "no"
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: prismunfold
+      POSTGRES_DB: prismunfold
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-prismunfold}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prismunfold -d prismunfold"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 1g
+    restart: unless-stopped
+
+  pipeline:
+    <<: *hardening
+    image: prismunfold/pipeline
+    build: { context: ., dockerfile: docker/pipeline/Dockerfile }
+    environment:
+      DATABASE_URL: postgresql://prismunfold:${POSTGRES_PASSWORD:-prismunfold}@db:5432/prismunfold
+      PIPELINE_INTERVAL: ${PIPELINE_INTERVAL:-600}
+      CHECK_LINKS: ${CHECK_LINKS:-1}
+    volumes:
+      - ./config:/app/config:ro
+      - ./catalog:/app/catalog:ro
+      - site:/site
+      - shared:/shared
+      - reports:/out:ro
+    depends_on:
+      volumes-init:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+    read_only: true
+    tmpfs: [/tmp]
+    mem_limit: 1g
+    cpus: 1.0
+    restart: unless-stopped
+
+  codex:
+    <<: *collector
+    image: prismunfold/collector-codex
+    build: { context: collectors, dockerfile: codex/Dockerfile }
+
+  claude:
+    <<: *collector
+    image: prismunfold/collector-claude
+    build: { context: collectors, dockerfile: claude/Dockerfile }
+
+  vibe:
+    <<: *collector
+    image: prismunfold/collector-vibe
+    build: { context: collectors, dockerfile: vibe/Dockerfile }
+
+  goose:
+    <<: *collector
+    image: prismunfold/collector-goose
+    build: { context: collectors, dockerfile: goose/Dockerfile }
+
+  web:
+    <<: *hardening
+    image: prismunfold/web
+    build: { context: ., dockerfile: docker/web/Dockerfile }
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+    volumes:
+      - site:/site:ro
+    depends_on:
+      volumes-init:
+        condition: service_completed_successfully
+    read_only: true
+    tmpfs: [/tmp]
+    mem_limit: 256m
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  site:
+  shared:
+  reports:

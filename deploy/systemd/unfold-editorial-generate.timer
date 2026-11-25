@@ -1,0 +1,10 @@
+[Unit]
+Description=Research PrismUnfold morning edition at 06:00 Zurich
+
+[Timer]
+OnCalendar=*-*-* 06:00:00 Europe/Zurich
+AccuracySec=1s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

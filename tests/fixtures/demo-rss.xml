@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+  <channel>
+    <title>Demo Zeitung</title>
+    <link>https://example.org/</link>
+    <item>
+      <title>Bundesrat beschliesst neues Klimapaket</title>
+      <link>https://example.org/news/klimapaket?utm_source=rss&amp;utm_medium=feed</link>
+      <pubDate>Fri, 06 Nov 2026 05:10:00 +0100</pubDate>
+      <description>Der Bundesrat hat ein neues Klimapaket verabschiedet. Es sieht Investitionen in die Gebäudesanierung vor.</description>
+      <media:content url="https://example.org/img/klimapaket.jpg" medium="image">
+        <media:credit>Demo-Fotografin</media:credit>
+      </media:content>
+    </item>
+    <item>
+      <title>Zürcher Kantonsrat debattiert Velowege</title>
+      <link>https://example.org/news/velowege</link>
+      <pubDate>Fri, 06 Nov 2026 06:20:00 +0100</pubDate>
+      <description>Im Kantonsrat wurde am Morgen über den Ausbau der Velowege gestritten. Eine Abstimmung folgt nächste Woche.</description>
+    </item>
+    <item>
+      <title>Automatisch erzeugter Kurzbericht zur Börse</title>
+      <link>https://example.org/news/boerse-ki</link>
+      <pubDate>Fri, 06 Nov 2026 06:00:00 +0100</pubDate>
+      <category>ai-generated</category>
+      <description>Die Börse schloss leicht im Plus.</description>
+    </item>
+    <item>
+      <title>Alter Bericht über Wahlen</title>
+      <link>https://example.org/news/alt</link>
+      <pubDate>Mon, 02 Nov 2026 10:00:00 +0100</pubDate>
+      <description>Veraltet.</description>
+    </item>
+  </channel>
+</rss>
