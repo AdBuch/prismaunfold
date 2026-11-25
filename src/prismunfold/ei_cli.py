@@ -43,6 +43,8 @@ def main(argv: list[str] | None = None) -> int:
     approve.add_argument("--event", required=True)
     approve.add_argument("--language", required=True)
     approve.add_argument("--reviewer", required=True, help="named human editor")
+    approve.add_argument("--draft-digest", required=True,
+                         help="SHA-256 draft_digest shown to and inspected by the editor")
     approve.add_argument("--checked-file", required=True,
                          help="JSON object claim_key -> original source document IDs reviewed")
     export = sub.add_parser("export", help="write the published content-pool contract")
@@ -71,6 +73,7 @@ def main(argv: list[str] | None = None) -> int:
             value = ei.draft(args.event, args.language, lambda dossier, language: result)
         elif args.action == "approve":
             value = ei.approve(args.event, args.language, reviewer=args.reviewer,
+                               expected_draft_digest=args.draft_digest,
                                checked_claim_sources=load_json(args.checked_file))
         elif args.action == "export":
             value = {"written": ei.export_pool(args.site)}
