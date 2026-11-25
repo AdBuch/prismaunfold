@@ -100,7 +100,7 @@ Milestone 0.3 should add a versioned adapter into the canonical article/edition 
 
 ## Tests
 
-    PYTHONPATH=src python3 -m unittest tests.test_editorial_intelligence -v
+    PYTHONPATH=src python3 -m unittest discover -s tests -p 'test_editorial_intelligence.py' -v
     PYTHONPATH=src python3 -m unittest discover -s tests
 
 Deterministic tests exercise multilingual event association, syndication, AI-secondary source lineage, restricted rights, research gaps, persistent retries and lease expiry, malformed research, draft validation, human review gating, immutable revisions, content-pool export and two reader profiles. They need neither secrets nor paid calls.
