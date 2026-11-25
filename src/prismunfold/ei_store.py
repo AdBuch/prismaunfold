@@ -58,11 +58,13 @@ class IntelligenceStore:
 
     def list(self, kind: str, event_id: str | None = None) -> list[dict]:
         p = self.param
-        rows = self.store.db.execute(
-            f"SELECT data FROM ei_records WHERE kind = {p} "
-            f"AND ({p} IS NULL OR event_id = {p}) ORDER BY id",
-            (kind, event_id, event_id),
-        ).fetchall()
+        if event_id is None:
+            query = f"SELECT data FROM ei_records WHERE kind = {p} ORDER BY id"
+            args = (kind,)
+        else:
+            query = f"SELECT data FROM ei_records WHERE kind = {p} AND event_id = {p} ORDER BY id"
+            args = (kind, event_id)
+        rows = self.store.db.execute(query, args).fetchall()
         return [json.loads(row[0]) for row in rows]
 
     def put(self, key: str, kind: str, event_id: str | None, payload: dict) -> bool:
