@@ -289,11 +289,15 @@ class EditorialIntelligence:
             filtered = {k: v for k, v in article.items()
                         if k not in ("approval", "content_digest", "source_document_ids")}
             filtered["review"] = {"status": "human_approved", "basis": "claim_evidence_review"}
+            checked_ids = {doc_id for ids in
+                           article["approval"]["checked_claim_sources"].values()
+                           for doc_id in ids}
             filtered["source_references"] = [
                 {"document_id": doc["document_id"], "url": doc["url"],
                  "source_id": doc["source_id"], "language": doc["language"],
                  "source_type": doc["source_type"], "original_work_id": doc["original_work_id"]}
                 for doc in self.dossier(article["event_id"])["documents"]
+                if doc["document_id"] in checked_ids
             ]
             public.append(filtered)
         return {"schema_version": PUBLIC_SCHEMA, "articles": public,
