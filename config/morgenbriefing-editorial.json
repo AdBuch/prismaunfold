@@ -1,0 +1,64 @@
+{
+  "name": "Morgenbriefing Weltlage",
+  "version": "2026-11-25",
+  "language": "de-CH",
+  "schedule": {
+    "frequency": "daily",
+    "time": "07:00",
+    "timezone": "Europe/Zurich"
+  },
+  "style": {
+    "tone": "sachlich, analytisch, prägnant; NZZ-inspiriert",
+    "length": "ca. 60 % der ursprünglichen ausführlichen Ausgaben",
+    "avoid_repetition": true
+  },
+  "priorities": [
+    "Schweiz",
+    "Peru",
+    "Krisenregionen",
+    "Internationales",
+    "Reisen"
+  ],
+  "sections": [
+    "Schweiz Politik",
+    "Schweiz Gesellschaft",
+    "Schweiz Regional",
+    "Peru Politik",
+    "Peru Gesellschaft",
+    "Krisen- und Konfliktgebiete",
+    "Reisen",
+    "International",
+    "Wirtschaft, Technologie & Wissenschaft"
+  ],
+  "regional": {
+    "frequency": "ungefähr jeden zweiten Tag",
+    "zurich_share_max": 0.5
+  },
+  "international": {
+    "topic_repeat_limit_per_week": 2,
+    "exception": "wesentliche neue Entwicklung",
+    "geographic_rotation": true
+  },
+  "extras": {
+    "deep_dive": "Analytische Magazin-Vertiefung zu wichtigem oder unterschätztem Thema, etwa 0.75 bis 1 A4-Seite",
+    "good_news": "Eine belegte positive Entwicklung pro Tag, wenn verfügbar",
+    "random_fact": "Ein überraschender, überprüfbarer Wissensfakt",
+    "situation_assessment": [
+      "Wirklich wichtig",
+      "Überschätzt",
+      "Unterbeachtet",
+      "Weiter beobachten"
+    ]
+  },
+  "editorial_rules": [
+    "Priorisiere Entwicklungen seit der letzten Ausgabe.",
+    "Nutze Primärquellen und unabhängige Medien; verlinke Quellen.",
+    "Trenne bestätigte Fakten, Behauptungen, Unsicherheit und Analyse.",
+    "Erkläre Relevanz und Auswirkungen statt Meldungen nur aneinanderzureihen.",
+    "Keine künstlichen Füllmeldungen oder alten Nachrichten unter neuem Datum.",
+    "Halte ein Publikationsarchiv vor, um Wiederholungen zu vermeiden.",
+    "Reisehinweise nur bei relevanten, verifizierten Änderungen."
+  ],
+  "purpose": "Personalisierte digitale Zeitung statt reiner Nachrichtenaggregation",
+  "note": "Aus den bisherigen Morgenbriefings und den besprochenen redaktionellen Vorgaben rekonstruiert; kein wörtlicher interner Systemprompt."
+}
