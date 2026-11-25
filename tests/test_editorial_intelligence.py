@@ -1,8 +1,10 @@
 """Deterministic Editorial Intelligence tests. No network, model keys or paid calls."""
 from __future__ import annotations
 
+import os
 import tempfile
 import unittest
+from uuid import uuid4
 from datetime import timedelta
 from pathlib import Path
 
@@ -206,6 +208,31 @@ class EditorialIntelligenceTests(unittest.TestCase):
         secondary["origin_type"] = "ai_secondary"
         self.ei.ingest([secondary])
         self.assertEqual(self.ei.dossier(self.event_id)["independent_original_works"], 2)
+
+
+@unittest.skipUnless(os.getenv("TEST_DATABASE_URL"), "TEST_DATABASE_URL is not set")
+class PostgresEditorialIntelligenceTests(unittest.TestCase):
+    """Runs against PostgreSQL 16 in the existing CI matrix; never needs secrets."""
+
+    def test_schema_jobs_and_published_pool(self):
+        from prismunfold.storage_pg import PostgresStore
+        store = PostgresStore(os.environ["TEST_DATABASE_URL"])
+        try:
+            ei = EditorialIntelligence(store)
+            doc = document("pg-fixture", "de", "pg-work-" + uuid4().hex,
+                           event_key="ei-pg-test-" + uuid4().hex)
+            event_id = ei.ingest([doc])[0]
+            self.assertGreaterEqual(store.schema_version(), 3)
+            self.assertEqual(ei.dossier(event_id)["independent_original_works"], 1)
+            job = ei.plan_research(event_id)
+            leased = ei.repo.lease(job["id"], worker="pg-test")
+            self.assertEqual(leased["state"], "leased")
+            self.assertIsNone(ei.repo.lease(job["id"], worker="second"))
+            ei.repo.finish(job["id"], leased["lease_id"], success=True)
+            self.assertEqual(ei.repo.get(f"job|{job['id']}")["state"], "completed")
+            self.assertEqual(ei.content_pool()["articles"], [])
+        finally:
+            store.close()
 
 
 if __name__ == "__main__":
