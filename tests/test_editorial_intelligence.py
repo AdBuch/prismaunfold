@@ -208,6 +208,7 @@ class EditorialIntelligenceTests(unittest.TestCase):
         secondary["origin_type"] = "ai_secondary"
         self.ei.ingest([secondary])
         self.assertEqual(self.ei.dossier(self.event_id)["independent_original_works"], 2)
+        self.assertEqual(self.ei.content_pool()["articles"], [])  # new evidence invalidates old approval
 
 
 @unittest.skipUnless(os.getenv("TEST_DATABASE_URL"), "TEST_DATABASE_URL is not set")
