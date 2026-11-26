@@ -1,16 +1,21 @@
 import { siteFooter, siteHeader } from './components/chrome.ts';
 import { ContentError, type ContentService } from './content/content-service.ts';
+import { applyMeta } from './lib/meta.ts';
 import { matchRoute } from './lib/router.ts';
+import { html } from './lib/util.ts';
 import { runtime } from './runtime.ts';
 import { aboutView, errorView, notFoundView } from './views/about.ts';
 import { archiveView } from './views/archive.ts';
-import { editorialView } from './views/editorial.ts';
-import { editionView } from './views/edition.ts';
+import { articleView } from './views/article.ts';
+import { authorView } from './views/author.ts';
+import { legacyArticlePath } from './views/legacy.ts';
 import { magazineView, magazinesView } from './views/magazine.ts';
-import { preferencesView } from './views/preferences.ts';
+import { meView } from './views/me.ts';
 import { storyView } from './views/story.ts';
-import { topicView } from './views/topic.ts';
+import { todayView } from './views/today.ts';
+import { dossierView, topicsView } from './views/topics.ts';
 import type { ViewResult } from './views/types.ts';
+import { worldView } from './views/world.ts';
 
 const LOADING_DELAY_MS = 250;
 
@@ -27,15 +32,20 @@ export function boot(content: ContentService, options: { demo: boolean }): void 
   async function resolve(pathname: string, search: URLSearchParams): Promise<ViewResult> {
     const route = matchRoute(pathname);
     switch (route.name) {
-      case 'edition': return editionView(content, route.date);
-      case 'editorial': return editorialView(route.date, route.articleIndex);
+      case 'today': return todayView(content, route.date, search);
+      case 'article': return articleView(content, route.id);
+      case 'world': return worldView(content);
       case 'archive': return archiveView(content);
       case 'story': return storyView(content, route.slug, search);
-      case 'topic': return topicView(content, route.slug);
+      case 'topics': return topicsView(content);
+      case 'topic': return dossierView(content, route.slug);
       case 'magazine': return magazineView(content, route.slug);
       case 'magazines': return magazinesView(content);
-      case 'preferences': return preferencesView(content);
+      case 'author': return authorView(content, route.slug);
+      case 'me': return meView(content);
       case 'about': return aboutView();
+      case 'redirect': return { title: '', nav: '', mode: 'news', body: html``, redirect: route.to + location.search };
+      case 'legacyArticle': return { title: '', nav: '', mode: 'news', body: html``, redirect: await legacyArticlePath(content, route.date, route.index) };
       default: return notFoundView(route.path);
     }
   }
@@ -57,7 +67,9 @@ export function boot(content: ContentService, options: { demo: boolean }): void 
       // Section labels are needed by every view, so they load first.
       runtime.sections = (await content.getSiteInfo()).sections;
       view = await resolve(location.pathname, new URLSearchParams(location.search));
-      latestDate = (await content.getLatestEdition())?.date;
+      if (view.redirect) { window.clearTimeout(loading); navigate(view.redirect, true); return; }
+      const [daily, feed] = await Promise.all([content.listDaily(), content.getLatestEdition()]);
+      latestDate = [daily[0]?.date, feed?.date].filter((d): d is string => !!d).sort().pop();
     } catch (err) {
       const message = err instanceof ContentError ? err.message : 'An unexpected error occurred.';
       if (!(err instanceof ContentError)) console.error(err);
@@ -71,7 +83,7 @@ export function boot(content: ContentService, options: { demo: boolean }): void 
       document.documentElement.dataset['mode'] = view.mode;
       app.removeAttribute('aria-busy');
       app.innerHTML = `${siteHeader(view.nav, latestDate).value}<div class="view">${view.body.value}</div>${siteFooter().value}`;
-      document.title = `${view.title} · PrismUnfold`;
+      applyMeta({ title: view.title, ...view.meta });
       window.scrollTo(0, 0);
       view.mount?.(app);
       announcer.textContent = `${view.title} loaded`;
@@ -147,7 +159,7 @@ export function boot(content: ContentService, options: { demo: boolean }): void 
 
   document.addEventListener('change', (ev) => {
     const t = ev.target as HTMLElement;
-    if (t instanceof HTMLSelectElement && t.hasAttribute('data-edition-select')) navigate(`/edition/${t.value}`);
+    if (t instanceof HTMLSelectElement && t.hasAttribute('data-edition-select')) navigate(`/edition/${t.value}${location.search}`);
   });
 
   document.addEventListener('navigate', ((ev: CustomEvent<string>) => navigate(ev.detail)) as EventListener);

@@ -12,3 +12,4 @@ dist/
 *.log
 frontend/dist/
 frontend/node_modules/
+frontend/screenshots/

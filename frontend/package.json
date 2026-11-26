@@ -1,6 +1,6 @@
 {
   "name": "prismunfold-frontend",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "PrismUnfold newspaper frontend. Reads the pipeline's JSON API; a demo build with fictional fixtures exists for tests",
   "type": "module",

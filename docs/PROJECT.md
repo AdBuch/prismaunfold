@@ -26,8 +26,8 @@ verified because a link exists.
 | --- | --- | --- |
 | 0.1 Repository and architecture consolidation | Branches reconciled, one canonical implementation, coherent docs, CI gates | **Implemented** on `feature/consolidation-0.1-0.2`; PR to `main` pending review |
 | 0.2 Reliable editorial and ingestion pipeline | prism-data import, provenance, source classification, granular states, recovery, scheduling, unified daily API, image rights | **Implemented and tested in CI fixtures; not yet verified on the production VM** |
-| 0.3 One newspaper, one daily edition, one Magazine | Frontend moves to `api/v1/daily`; Today's Edition replaces the separate Morgenbriefing/feed views; Magazine model | Planned. Brief: [phase-2-frontend-brief.md](phase-2-frontend-brief.md) |
-| 0.4 Personalisation and social | My PrismUnfold, followed topics, collections | Planned |
+| 0.3 One newspaper, one daily edition, one Magazine | Today's Edition unifies Morgenbriefing and feed edition; article layers; The World, Magazine, Topics, Voices, My PrismUnfold; reader profile and deterministic composer | **Implemented on `feature/0.3-unified-newspaper`** (PR pending); product architecture: [PRODUCT.md](PRODUCT.md) |
+| 0.4 Accounts, personalisation and social | Accounts and synchronised settings, publisher follows, collections and shareable mixes, verified journalist profiles, interface languages | Planned |
 | 0.5 Release engineering | Release automation, visual regression, production CD | Partly: release gate, gated deployment with backup and rollback (v0.2.0); visual regression and CD planned |
 
 ## Status by capability
@@ -43,7 +43,9 @@ structured logs; systemd timers and in-container loop.
 **Experimental** – research/writing split for Codex (`EDITORIAL_STAGES=split`);
 subscription logins for Claude Code and Codex collectors.
 
-**Planned** – claim-level checker that reads cited pages; Claude/Mistral as edition
+**Implemented in 0.3** – one reader-facing newspaper over canonical articles; layered article page; device-local reader profile, onboarding and deterministic personal edition with coverage gaps; dossiers; Voices records; rights-based image rendering; page metadata; 0.2 URL redirects.
+
+**Planned** – accounts and synchronisation; pipeline indexes for topics, magazine, authors and the World (PIPELINE_INTERFACE.md); aggregated coverage-gap signals; server-side rendering for crawlers; claim-level checker that reads cited pages; Claude/Mistral as edition
 writers; short news briefs; editor UI for approvals; travel preferences from private
 config; continental rotation; translation EN/ES/DE; Angular port and Go write API
 (decided, not started).

@@ -62,7 +62,7 @@ jobs:
   frontend:
     name: Frontend (types, unit tests, browser tests on the demo build)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     defaults:
       run:
         shell: bash
@@ -90,6 +90,13 @@ jobs:
           PORT=4200 node scripts/serve.mjs &
           for i in $(seq 1 20); do curl -fsS http://localhost:4200/ >/dev/null && break; sleep 1; done
           PORT=4200 npm run test:e2e
+      - name: Desktop and mobile screenshots of the demo build
+        run: PORT=4200 OUT=screenshots FULL=1 node tests/screenshots.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-demo
+          path: frontend/screenshots
+          retention-days: 30
 
   scripts:
     name: Shell scripts and compose files
@@ -203,6 +210,16 @@ jobs:
           test "$(jq -r '.byline' story.json)" = "Claude Code"
           test "$(jq -r '.verification.state' story.json)" = "review_required"
           test "$(jq -r '.sentences[0].verification.support' story.json)" = "not_checked"
+
+      - name: An approved prism-data bulletin joins the daily edition (fixture, no GitHub, no AI)
+        run: |
+          docker compose run --rm -T -v "$PWD/tests/fixtures/prism-data:/fixtures:ro" pipeline \
+            import-bulletin --date 2026-11-25 --file /fixtures/2026-11-25.json
+          # test_import_unverified: stored, not published until an editor approves it
+          test "$(curl -fsS http://localhost:8080/api/v1/daily/index.json | jq 'length')" = "0"
+          docker compose run --rm -T pipeline import-bulletin --date 2026-11-25 --review approved --reviewer ci
+          curl -fsS http://localhost:8080/api/v1/daily/index.json | jq -e '.[0].date == "2026-11-25"'
+          curl -fsS http://localhost:8080/api/v1/daily/2026-11-25.json | jq -e '.schemaVersion == "prismunfold.daily-edition/1" and (.articles | length) > 0'
 
       - name: The story is stored in PostgreSQL and the job status is reported
         run: |

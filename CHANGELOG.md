@@ -3,6 +3,24 @@
 Releases are tags `vX.Y.Z` on `main` whose CI succeeded (docs/RELEASE.md).
 Only releases are deployed to production.
 
+## 0.3.0
+
+One newspaper (docs/PRODUCT.md). Pull request #5. Builds on 0.2.0 without backend
+changes; a server that never ran 0.2.0 can deploy 0.3.0 directly.
+- Today's Edition combines the editorial daily edition (Codex, prism-data) and the feed
+  desk's edition; the Morgenbriefing is no longer a separate publication.
+- Navigation: Today, The World, Magazine, Topics, Archive, My PrismUnfold.
+- Article pages unfold in layers: overview, article, context, perspectives, evidence.
+- Device-local reader profile with onboarding; deterministic personal edition that keeps
+  the day's important news, limits repetition, keeps a discovery share and lists
+  coverage gaps instead of inventing content (docs/READER_PROFILE.md).
+- Dossiers, Voices pages (labelled as assembled records), unified Magazine, archive over
+  all editions; images only with rights, AI illustrations labelled.
+- Canonical links, Open Graph, `noindex` for personal pages; 0.2 URLs redirect.
+- Interface contract for the editorial pipeline (docs/PIPELINE_INTERFACE.md).
+- No backend or database change; rollback to 0.2.0 only swaps the frontend. Reader
+  settings from 0.2 are migrated, the old browser key is kept.
+
 ## 0.2.0
 
 First production release from `main`. Consolidates the repository (milestone 0.1) and

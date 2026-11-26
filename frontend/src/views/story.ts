@@ -125,5 +125,5 @@ export async function storyView(svc: ContentService, slug: string, search: URLSe
     </section>` : ''}
   </main>`;
 
-  return { title: story.headline, nav: 'edition', mode: 'news', body };
+  return { title: story.headline, nav: 'today', mode: 'news', body };
 }

@@ -198,6 +198,8 @@ changes or on demand, never as a gate, because it depends on the network.
 ### Where things are
 
 - `docs/PROJECT.md`: vision, the one roadmap, status (implemented / experimental / planned / deprecated)
+- `docs/PRODUCT.md`: product architecture, navigation and routes of the reader experience
+- `docs/READER_PROFILE.md`, `docs/PIPELINE_INTERFACE.md`: reader profile, composition and the contract with the editorial pipeline
 - `docs/architecture.md`: components, data flow, database model, trust boundaries
 - `docs/EDITORIAL_WORKFLOW.md`: contributions, states, publication policy, source checks, images
 - `docs/API.md`: the JSON API, including the unified daily edition

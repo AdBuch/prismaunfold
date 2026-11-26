@@ -1,5 +1,7 @@
 import type { Edition, MagazineFeature, Section, Story, Topic } from '../models.ts';
-import type { AdjacentEditions, ContentService, SiteInfo } from './content-service.ts';
+import { articleDate } from '../models-daily.ts';
+import { findArticle, type AdjacentEditions, type ContentService, type SiteInfo } from './content-service.ts';
+import { dailyEditions } from './daily-fixtures.ts';
 import { editions } from './editions.ts';
 import { magazines } from './magazines.ts';
 import { stories } from './stories.ts';
@@ -51,5 +53,18 @@ export class FixtureContentService implements ContentService {
   listMagazines() { return wait(magazines); }
   getEditionsForStory(slug: string) {
     return wait(this.sortedEditions.filter((e) => e.placements.some((p) => p.storySlug === slug)));
+  }
+
+  listDaily() {
+    return wait([...dailyEditions].sort((a, b) => b.date.localeCompare(a.date)).map((e) => ({
+      date: e.date, mainHeadline: e.mainHeadline, articleCount: e.articles.length, magazineCount: e.magazine.length,
+      completeness: e.transparency.completeness, contributors: e.contributors.map((c) => c.provider),
+    })));
+  }
+  getDaily(date: string) { return wait(dailyEditions.find((e) => e.date === date)); }
+  getArticle(articleId: string) {
+    const edition = dailyEditions.find((e) => e.date === articleDate(articleId));
+    const found = edition ? findArticle(edition, articleId) : undefined;
+    return wait(edition && found ? { ...found, edition } : undefined);
   }
 }

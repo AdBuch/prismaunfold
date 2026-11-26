@@ -1,4 +1,5 @@
 import type { Edition, MagazineFeature, Section, Story, Topic } from '../models.ts';
+import type { DailyArticle, DailyEdition, DailyIndexEntry } from '../models-daily.ts';
 
 export interface AdjacentEditions {
   previous?: string;
@@ -43,4 +44,21 @@ export interface ContentService {
   listMagazines(): Promise<MagazineFeature[]>;
   /** Editions in which a story was placed. */
   getEditionsForStory(slug: string): Promise<Edition[]>;
+
+  // --- Unified daily edition (api/v1/daily, milestone 0.3) ---
+  /** Newest first; empty when the pipeline has not exported any daily edition yet. */
+  listDaily(): Promise<DailyIndexEntry[]>;
+  getDaily(date: string): Promise<DailyEdition | undefined>;
+  /** A canonical article (or a matched coverage contribution) by its id, with its edition. */
+  getArticle(articleId: string): Promise<{ article: DailyArticle; edition: DailyEdition; parent?: DailyArticle } | undefined>;
+}
+
+/** Shared lookup used by both services: the article id carries its edition date. */
+export function findArticle(edition: DailyEdition, articleId: string): { article: DailyArticle; parent?: DailyArticle } | undefined {
+  for (const article of [...edition.articles, ...edition.goodNews, ...edition.magazine]) {
+    if (article.articleId === articleId) return { article };
+    const covered = article.coverage.find((c) => c.articleId === articleId);
+    if (covered) return { article: covered, parent: article };
+  }
+  return undefined;
 }
