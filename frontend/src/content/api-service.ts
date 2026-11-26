@@ -1,5 +1,7 @@
 import type { Edition, MagazineFeature, Story, Topic } from '../models.ts';
-import { ContentError, type AdjacentEditions, type ContentService, type SiteInfo } from './content-service.ts';
+import { articleDate, type DailyEdition, type DailyIndexEntry } from '../models-daily.ts';
+import { ContentError, findArticle, type AdjacentEditions, type ContentService, type SiteInfo } from './content-service.ts';
+import { parseDaily, parseDailyIndex } from './daily.ts';
 
 type FetchFn = (input: string, init?: { signal?: AbortSignal }) => Promise<Response>;
 
@@ -149,5 +151,26 @@ export class ApiContentService implements ContentService {
 
   async getEditionsForStory(slug: string): Promise<Edition[]> {
     return (await this.listEditions()).filter((e) => e.placements.some((p) => p.storySlug === slug));
+  }
+
+  async listDaily(): Promise<DailyIndexEntry[]> {
+    const raw = await this.get('daily/index.json');
+    return raw === undefined ? [] : parseDailyIndex(raw);
+  }
+
+  async getDaily(date: string): Promise<DailyEdition | undefined> {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return undefined;
+    const raw = await this.get(`daily/${date}.json`);
+    if (raw === undefined) return undefined;
+    const edition = parseDaily(raw);
+    if (!edition) throw new ContentError('invalid', 'This edition could not be read.');
+    return edition;
+  }
+
+  async getArticle(articleId: string) {
+    const date = articleDate(articleId);
+    const edition = date ? await this.getDaily(date) : undefined;
+    const found = edition ? findArticle(edition, articleId) : undefined;
+    return edition && found ? { ...found, edition } : undefined;
   }
 }
