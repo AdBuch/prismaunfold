@@ -175,7 +175,7 @@ function readList<T>(key: string, check: (x: unknown) => x is T): T[] {
 }
 const isSaved = (x: unknown): x is SavedItem => typeof x === 'object' && x !== null
   && typeof (x as SavedItem).id === 'string' && typeof (x as SavedItem).title === 'string'
-  && typeof (x as SavedItem).href === 'string' && (x as SavedItem).href.startsWith('/');
+  && typeof (x as SavedItem).href === 'string' && /^\/(?!\/)[\w\-./%?=&]*$/.test((x as SavedItem).href);
 
 export const savedItems = (): SavedItem[] => readList(SAVED, isSaved);
 export const isSavedItem = (id: string): boolean => savedItems().some((s) => s.id === id);

@@ -103,7 +103,8 @@ await test('magazine: daily features and earlier features in one place', async (
   assert.ok(await p.getByRole('link', { name: /Who owns a spring/ }).first().isVisible());
   await p.getByRole('link', { name: /The Water That Remembers/i }).first().click();
   await p.waitForURL('**/magazine/the-water-that-remembers');
-  assert.ok(await p.locator('.mag-quote').first().isVisible());
+  await heading(p, /Water That Remembers/i);
+  await p.locator('.mag-quote').first().waitFor();
 });
 
 await test('topics and dossiers connect chronology, background and open questions', async (p) => {
@@ -158,7 +159,7 @@ await test('onboarding builds a personal edition from the same articles', async 
   assert.equal(await p.getAttribute('link[rel="canonical"]', 'href'), `${base}/edition/2026-11-09`);
   await p.getByRole('link', { name: 'Read the public edition' }).click();
   await p.waitForURL('**/edition/2026-11-09?edition=public');
-  assert.ok(await p.getByText("Today's edition", { exact: true }).isVisible());
+  await p.getByText("Today's edition", { exact: true }).waitFor(); // rendered after the URL changes
 });
 
 await test('save, history and reset stay on the device', async (p) => {

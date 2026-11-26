@@ -174,3 +174,11 @@ test('0.2 article indexes map to the same articles', () => {
   assert.equal(order[e.articles.length]?.kind, 'good_news');
   assert.equal(order[e.articles.length + 1]?.kind, 'magazine');
 });
+
+test('saved items only keep same-origin paths', () => {
+  store.clear();
+  store.set('prismunfold.saved.v1', JSON.stringify([
+    { id: 'a', title: 'A', href: '/article/a', savedAt: 'x' }, { id: 'b', title: 'B', href: '//evil.example', savedAt: 'x' },
+    { id: 'c', title: 'C', href: 'javascript:alert(1)', savedAt: 'x' }]));
+  assert.deepEqual(savedItems().map((s) => s.id), ['a']);
+});
