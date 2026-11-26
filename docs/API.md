@@ -7,7 +7,7 @@ There is no application server in the read path.
 | --- | --- | --- |
 | `index.json`, `editions.json`, `stories/{slug}.json`, `topics/{slug}.json`, … | Implemented (feed desk and agent stories) | `frontend/src/models.ts` |
 | `editorial/morgenbriefing.json` | Implemented; used by `/morgenbriefing` | List of editorial editions, newest first; see below |
-| `daily/index.json`, `daily/{date}.json` | Implemented in 0.2; **not yet used by the frontend** | Unified daily edition, below. Target contract for milestone 0.3 |
+| `daily/index.json`, `daily/{date}.json` | Implemented in 0.2; read by the frontend since 0.3 (Today, articles, World, Magazine, Topics, Voices) | Unified daily edition, below |
 
 All writes are atomic (temporary file + rename); a failed export leaves the previous
 file in place. Only published or approved content is exported.
@@ -76,5 +76,17 @@ contributions of that date.
 `daily/index.json`: `[{date, mainHeadline, articleCount, magazineCount, completeness,
 contributors[], href}]`, newest first.
 
-The contract is checked by `tests/test_dedupe_images_api.py::DailyContractTests`.
-Changing it requires a new `schemaVersion`.
+The contract is checked by `tests/test_dedupe_images_api.py::DailyContractTests` (export)
+and `frontend/tests/newspaper.test.ts` (reader). Changing it requires a new `schemaVersion`.
+
+Optional article fields the frontend already reads when present (pipeline backlog:
+[PIPELINE_INTERFACE.md](PIPELINE_INTERFACE.md)): `summary`, `whyItMatters`, `regions`,
+`interests`, `importance`, `authors[]`, `corrections[]`, `updatedAt`, `language`,
+`sources[].author`; per edition `editionProfile`, `language`.
+
+## Compatibility notes (0.3)
+
+- `editorial/morgenbriefing.json` is still exported for compatibility; the frontend
+  no longer reads it. The `/morgenbriefing…` URLs redirect to editions and articles.
+- `editions.json`, `stories/…`, `topics/…`, `magazines.json` are unchanged and still read.
+- Article ids are canonical URLs (`/article/{articleId}`); their date prefix must stay.

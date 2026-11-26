@@ -97,6 +97,8 @@ export interface DailyArticle {
   whyItMatters?: string;
   authors?: { name: string; slug?: string; verified?: boolean; publisher?: string }[];
   regions?: string[];
+  /** Interest keys (docs/READER_PROFILE.md). */
+  interests?: string[];
   importance?: number;
   language?: string;
   corrections?: DailyCorrection[];

@@ -192,7 +192,7 @@ export function clusterKey(headline: string, topic?: string): string {
 
 export interface ArticleLike {
   articleId: string; headline: string; section: string; kind: string; lead: string; topic?: string;
-  regions?: string[]; importance?: number; paragraphs: { text: string }[];
+  regions?: string[]; interests?: string[]; importance?: number; paragraphs: { text: string }[];
   authors?: { name: string }[]; sources: { publisher: string }[]; provenance?: { provider: string };
 }
 
@@ -202,7 +202,7 @@ export function fromArticle(a: ArticleLike, rank: number, total: number, mainId?
   const importance = a.importance ?? (a.articleId === mainId ? 1 : Math.round(derived * 100) / 100);
   return {
     id: a.articleId, headline: a.headline, section: a.section, kind: a.kind === 'news' || !a.kind ? 'news' : a.kind,
-    topics: topicsForSection(a.section), topicSlug: a.topic,
+    topics: a.interests?.length ? a.interests : topicsForSection(a.section), topicSlug: a.topic,
     regions: a.regions?.length ? a.regions : regionsForSection(a.section),
     importance, minutes: readingMinutes(words(a.lead, ...a.paragraphs.map((p) => p.text))),
     // Distinct topics are distinct events; within one topic, headline tokens separate events.

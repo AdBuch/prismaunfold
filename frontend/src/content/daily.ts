@@ -77,7 +77,7 @@ export function article(v: unknown, depth = 0): DailyArticle | undefined {
     coverage: depth < 2 ? list(v['coverage'], (c) => article(c, depth + 1), 20) : [],
     storySlug: /^[\w-]{1,120}$/.test(str(v['storySlug'])) ? str(v['storySlug']) : undefined,
     summary: opt(v['summary'], 2000), whyItMatters: opt(v['whyItMatters'], 2000),
-    regions: strings(v['regions']), language: opt(v['language'], 20), updatedAt: opt(v['updatedAt'], 60),
+    regions: strings(v['regions']), interests: strings(v['interests']), language: opt(v['language'], 20), updatedAt: opt(v['updatedAt'], 60),
     importance: typeof v['importance'] === 'number' && Number.isFinite(v['importance']) ? Math.max(0, Math.min(1, v['importance'])) : undefined,
     authors: list(v['authors'], (a) => rec(a) && str(a['name']) ? {
       name: str(a['name'], 160), slug: /^[\w-]{1,80}$/.test(str(a['slug'])) ? str(a['slug']) : undefined,
