@@ -6,7 +6,7 @@ import { chromium } from 'playwright';
 
 const base = process.env.BASE_URL ?? 'http://localhost:8080';
 const expectHeadline = process.env.EXPECT_HEADLINE ?? '';
-const browser = await chromium.launch();
+const browser = await chromium.launch(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {});
 const results = [];
 const test = async (name, fn, viewport = { width: 1280, height: 900 }) => {
   const ctx = await browser.newContext({ viewport });
@@ -61,14 +61,32 @@ await test('archive, timeline, preferences and about are reachable', async (p) =
     await timeline.click();
     await ready(p, '.timeline');
   }
-  await p.goto(base + '/preferences');
-  await ready(p, '[data-prefs-form]');
-  await p.getByRole('button', { name: 'Save' }).click();
-  await p.waitForFunction(() => /Saved|does not allow/.test(document.querySelector('[data-prefs-status]')?.textContent ?? ''));
+  await p.goto(base + '/preferences'); // 0.2 URL redirects to My PrismUnfold
+  await p.waitForURL('**/me');
+  await ready(p, '[data-profile-form]');
   await p.goto(base + '/about');
   await ready(p, '.states');
   assert.match(await p.locator('main h1').innerText(), /How this paper is made/);
 });
+
+// The pipeline's unified daily edition (api/v1/daily), e.g. an imported and approved prism-data bulletin.
+const daily = await fetch(base + '/api/v1/daily/index.json').then((r) => (r.ok ? r.json() : [])).catch(() => []);
+if (daily.length) {
+  await test('the daily edition from the pipeline renders as one newspaper with provenance', async (p) => {
+    const date = daily[0].date;
+    await p.goto(`${base}/edition/${date}`);
+    await ready(p, '.lead__title a');
+    assert.match(await p.locator('.lead__title').innerText(), new RegExp(daily[0].mainHeadline.headline.slice(0, 20).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    await p.locator('.lead__title a').click();
+    await ready(p, '.story__title');
+    assert.match(p.url(), /\/article\//);
+    await p.locator('#evidence summary').click();
+    assert.match(await p.locator('#evidence').innerText(), /not independently verified/);
+    assert.match(await p.locator('#evidence').innerText(), /ChatGPT bulletin|AI editorial worker/);
+    await p.goto(`${base}/morgenbriefing/${date}`); // 0.2 URL
+    await p.waitForURL(`**/edition/${date}`);
+  });
+}
 
 await test('unknown story and unknown date are handled', async (p) => {
   await p.goto(base + '/story/does-not-exist');
@@ -78,7 +96,7 @@ await test('unknown story and unknown date are handled', async (p) => {
 });
 
 await test('no horizontal overflow on a phone', async (p) => {
-  for (const path of ['/', '/archive', '/preferences', '/about', '/magazine']) {
+  for (const path of ['/', '/world', '/archive', '/me', '/about', '/magazine', '/topics']) {
     await p.goto(base + path);
     await ready(p, 'main');
     const overflow = await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
