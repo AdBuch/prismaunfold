@@ -41,7 +41,9 @@ function liveAbout(): ViewResult {
       <ul class="plain-list">
         <li><strong>The feed desk</strong> follows publisher feeds, groups reports about the same event and quotes each article's own title or excerpt, with a link.</li>
         <li><strong>AI agents</strong> research a topic on the web and write a short report. Several agents may cover the same topic independently; their reports appear side by side under their own names.</li>
+        <li><strong>AI editorial workers</strong> (today Codex) write the daily edition and the magazine from cited sources. A morning bulletin curated with ChatGPT (prism-data) contributes as a secondary source; it never counts as an independent confirmation.</li>
       </ul>
+      <p>They are contributors to one newspaper, not separate publications. Each article names its contributor under “Evidence and transparency”. Matching reports of the same event are shown together instead of twice.</p>
       <h2 class="small-head">What the labels mean</h2>
       <dl class="states">
         <div><dt>${verificationBadge('supported')}</dt><dd>A check confirmed that the cited source says what the sentence says.</dd></div>
@@ -52,9 +54,9 @@ function liveAbout(): ViewResult {
       <h2 class="small-head">What we do not claim</h2>
       <p>No story here is called verified. A sentence without a source is removed before publication, but a source can still be wrong, and software can misread it. Follow the links and judge for yourself.</p>
       <h2 class="small-head">Pictures</h2>
-      <p>The artwork is generated from shapes and is not photography. It illustrates a section, not an event.</p>
-      <h2 class="small-head">Your preferences</h2>
-      <p>The edition is the same for everyone. <a href="${paths.preferences()}" data-link>Preferences</a> stay in your browser and only change what is shown first.</p>
+      <p>A picture is shown only when its credit and usage rights are documented. AI illustrations are labelled and are never presented as photographs of real events. Without a cleared picture an article is shown as text. The generated artwork on feed-desk stories is not photography.</p>
+      <h2 class="small-head">Your edition</h2>
+      <p>The public edition is the same for everyone. <a href="${paths.me()}" data-link>My PrismUnfold</a> recomposes the same articles for you: the important news of the day always stays in, and your settings stay in your browser.</p>
     </main>`,
   };
 }
@@ -97,7 +99,7 @@ export function errorView(message: string): ViewResult {
 export function emptyView(): ViewResult {
   return {
     title: 'No edition yet',
-    nav: 'edition',
+    nav: 'today',
     mode: 'news',
     body: html`<main id="main" tabindex="-1" class="page page--narrow state state--empty">
       <p class="kicker">Nothing published yet</p>

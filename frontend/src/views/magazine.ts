@@ -1,4 +1,6 @@
+import { dailyFigure, leadImage, providerLabel } from '../components/daily-ui.ts';
 import { figure, formatMedium, html, shareButton, sourceList } from '../components/ui.ts';
+import { placed, recentDaily } from '../content/collect.ts';
 import type { ContentService } from '../content/content-service.ts';
 import { artSvg } from '../lib/art.ts';
 import { paths } from '../lib/router.ts';
@@ -76,13 +78,28 @@ export async function magazineView(svc: ContentService, slug: string): Promise<V
 }
 
 export async function magazinesView(svc: ContentService): Promise<ViewResult> {
-  const features = await svc.listMagazines();
-  const body = html`<main id="main" tabindex="-1" class="page">
+  // One canonical magazine: daily-edition features and the earlier long-form features.
+  const [features, editions] = await Promise.all([svc.listMagazines(), recentDaily(svc, 60, (e) => e.magazineCount > 0)]);
+  const daily = placed(editions).filter((p) => p.article.kind === 'magazine').sort((a, b) => b.date.localeCompare(a.date));
+  const [cover, ...more] = daily;
+  const coverImage = cover ? leadImage(cover.article) : undefined;
+  const body = html`<main id="main" tabindex="-1" class="page magazine-index">
     <p class="kicker">Magazine</p>
     <h1 class="page__title">Background</h1>
     <p class="page__dek">Slower, longer and more atmospheric. Where the daily edition tells you what happened, the magazine explains how we got here.</p>
-    ${features.length ? '' : html`<p class="state state--empty hint">No feature has been published yet. Deep dives appear here when a topic has enough reporting behind it.</p>`}
-    <div class="mag-index">${features.map((f) => html`<article class="mag-index__item">
+    ${!features.length && !daily.length ? html`<p class="state state--empty hint">No feature has been published yet. Deep dives appear here when a topic has enough reporting behind it.</p>` : ''}
+    ${cover ? html`<article class="mag-cover${coverImage ? '' : ' mag-cover--text'}">
+      ${coverImage ? html`<a href="${paths.article(cover.article.articleId)}" data-link tabindex="-1" aria-hidden="true">${dailyFigure(coverImage, { ratio: '16 / 9' })}</a>` : ''}
+      <div class="mag-cover__text"><p class="kicker">Latest feature · ${formatMedium(cover.date)}</p>
+        <h2 class="mag-cover__title"><a href="${paths.article(cover.article.articleId)}" data-link>${cover.article.headline}</a></h2>
+        <p>${cover.article.lead}</p><p class="hint">${providerLabel(cover.article.provenance.provider)}</p></div>
+    </article>` : ''}
+    <div class="mag-index">${more.map((p) => { const img = leadImage(p.article); return html`<article class="mag-index__item">
+      ${img ? html`<a href="${paths.article(p.article.articleId)}" data-link tabindex="-1" aria-hidden="true">${dailyFigure(img, { ratio: '4 / 3' })}</a>` : ''}
+      <p class="kicker">${formatMedium(p.date)}</p>
+      <h2 class="mag-index__title"><a href="${paths.article(p.article.articleId)}" data-link>${p.article.headline}</a></h2>
+      <p>${p.article.lead}</p>
+    </article>`; })}${features.map((f) => html`<article class="mag-index__item">
       <a href="${paths.magazine(f.slug)}" data-link tabindex="-1" aria-hidden="true">${figure(f.hero, { ratio: '4 / 3' })}</a>
       <p class="kicker">${f.kicker}</p>
       <h2 class="mag-index__title"><a href="${paths.magazine(f.slug)}" data-link>${f.title}</a></h2>
@@ -90,5 +107,6 @@ export async function magazinesView(svc: ContentService): Promise<ViewResult> {
       <p class="hint">${f.readingMinutes} minute read</p>
     </article>`)}</div>
   </main>`;
-  return { title: 'Magazine', nav: 'magazine', mode: 'news', body };
+  return { title: 'Magazine', nav: 'magazine', mode: 'magazine', body,
+    meta: { description: 'Long-form background, reports and deep dives.', canonical: paths.magazines() } };
 }
