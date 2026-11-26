@@ -64,7 +64,7 @@ event, then revoke the old token on GitHub.
 
 Production runs only verified releases: `unfold-update [vX.Y.Z]`. Gate, backup,
 checks and automatic rollback are described in [RELEASE.md](RELEASE.md), including
-the exact commands for the first deployment of v0.2.0.
+the exact commands for the first deployment (v0.3.0).
 
 ## Scheduling
 

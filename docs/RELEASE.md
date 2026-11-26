@@ -59,7 +59,12 @@ Local configuration belongs in untracked files (`.env`, `docker-compose.override
 override there too, otherwise Compose ignores it; the deploy script warns about this:
 `COMPOSE_FILE=docker-compose.yml:deploy/compose.prism-data.yml:docker-compose.override.yml`.
 
-## First production deployment of v0.2.0 (from `integration/mvp`)
+## First production deployment (from `integration/mvp`)
+
+The server still runs the pre-release `integration/mvp` checkout. The first gated
+deployment can go straight to the newest release, currently **v0.3.0**: it contains
+everything from 0.2.0 (schema version 2, importer, recovery) plus the 0.3 frontend.
+`v0.2.0` stays as a tag for the record and as a rollback target.
 
 Run on the server as `adrian`. Steps 1–3 change nothing.
 
@@ -79,10 +84,10 @@ git diff > ~/unfold-local-changes-$(date +%F).patch
 # 3. Install the new update command; the old one is kept
 cp -p ~/bin/unfold-update ~/bin/unfold-update.legacy-$(date +%F)
 git fetch --tags origin
-git show v0.2.0:deploy/unfold-update > ~/bin/unfold-update && chmod 755 ~/bin/unfold-update
+git show v0.3.0:deploy/unfold-update > ~/bin/unfold-update && chmod 755 ~/bin/unfold-update
 
 # 4. Deploy (backup, switch, checks, automatic rollback on failure)
-unfold-update v0.2.0
+unfold-update v0.3.0
 
 # 5. Timers: the deploy output says whether the units differ from the installed ones
 sudo bash /opt/unfold/scripts/install-editorial-timers.sh   # only if reported
@@ -143,6 +148,20 @@ systemctl list-timers 'unfold-editorial-*' --no-pager
 journalctl -u unfold-editorial-generate.service -u unfold-editorial-publish.service --since today --no-pager
 ```
 
+The 0.3 frontend (client-side routes all return the app shell; nginx is unchanged):
+
+```bash
+for p in / /world /magazine /topics /archive /me /edition/2026-11-25 /morgenbriefing /preferences; do
+  printf '%-22s ' "$p"; curl -fsS -o /dev/null -w '%{http_code}\n' "http://localhost:8080$p"
+done                                                   # every line 200
+curl -fsS http://localhost:8080/main.js | grep -c 'Personalise access to reality'   # 1 or more: the 0.3 bundle is live
+```
+
+In a browser: Today shows the newest edition; `/edition/2026-11-25` shows the editorial
+articles of 25 November (after the recovery above); `/morgenbriefing` lands on Today; My PrismUnfold
+offers onboarding; an article opens with Context / Perspectives / Evidence. A reader
+who had set preferences in 0.2 finds them migrated under My PrismUnfold.
+
 The next morning: 06:00 generate (or recover), 07:00 publish, prism-data import from
 07:00 in the pipeline log.
 
@@ -151,6 +170,9 @@ The next morning: 06:00 generate (or recover), 07:00 publish, prism-data import 
 ```bash
 unfold-update rollback          # previous commit + :rollback images, then checks
 ```
+
+Rollback from v0.3.0 to v0.2.0 swaps only the frontend (`unfold-update v0.2.0` works as
+well, being a release). Reader settings survive: 0.3 keeps the 0.2 browser key.
 
 The database stays as it is: 0.2 only added tables, which older code ignores. Only if
 data itself must be reset:
